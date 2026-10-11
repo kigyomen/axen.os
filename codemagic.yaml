@@ -34,7 +34,11 @@ workflows:
       - name: Add iOS platform (npx cap add ios)
         script: |
           cd mobile
-          npx cap add ios
+          # Capacitor 8ではデフォルトがSwift Package Manager(SPM)になり、
+          # --packagemanagerを明示しないとPodfileが生成されない
+          # (cap add --help で確認済み: CocoaPods/SPMから選択可能)。
+          # このworkflowはCocoaPods(Podfile)を前提にしているため明示する。
+          npx cap add ios --packagemanager CocoaPods
 
       - name: Install CocoaPods dependencies
         script: |
