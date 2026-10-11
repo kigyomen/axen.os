@@ -115,6 +115,11 @@ export function formatCoachContext(context: CoachContext): string {
 
   const lines: string[] = [];
 
+  if (profile?.display_name) {
+    lines.push(`ユーザーの名前: ${profile.display_name}`);
+    lines.push("");
+  }
+
   if (profile?.onboarding_completed) {
     lines.push("ユーザーが初回登録時に伝えた起業の状況:");
     if (profile.needs_idea_help) {
