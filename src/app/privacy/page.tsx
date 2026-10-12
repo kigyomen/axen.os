@@ -152,7 +152,15 @@ export default function PrivacyPolicyPage() {
 
       <Section title="9. お問い合わせ">
         <p>
-          本ページに関するお問い合わせ、またはデータ削除のご希望については、開発者までご連絡ください（お問い合わせ窓口は準備中です）。
+          本ページに関するお問い合わせ、またはデータ削除のご希望については、以下のメールアドレスまでご連絡ください。
+        </p>
+        <p>
+          <a
+            href="mailto:kigyoshiyo@gmail.com"
+            className="font-medium text-foreground underline"
+          >
+            kigyoshiyo@gmail.com
+          </a>
         </p>
       </Section>
     </main>

@@ -132,7 +132,13 @@ export default async function SettingsPage({
 
       <section>
         <SectionHeader title="その他" />
-        <Card>
+        <Card className="flex flex-col gap-3">
+          <Link
+            href="/support"
+            className="text-sm font-medium text-foreground transition-colors hover:underline"
+          >
+            サポート・お問い合わせ
+          </Link>
           <Link
             href="/privacy"
             className="text-sm font-medium text-foreground transition-colors hover:underline"
