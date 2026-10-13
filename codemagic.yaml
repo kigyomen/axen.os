@@ -40,6 +40,28 @@ workflows:
           # このworkflowはCocoaPods(Podfile)を前提にしているため明示する。
           npx cap add ios --packagemanager CocoaPods
 
+      - name: Apply app icon (from mobile/assets/icon.png)
+        script: |
+          # Capacitor 8のiosテンプレートは、Xcode 14以降の「単一サイズApp Icon」
+          # 形式を使っており、AppIcon.appiconset配下には1024x1024pxの
+          # AppIcon-512@2x.png が1枚あるだけ(ローカルでcap add iosを実行し、
+          # 生成されたContents.jsonの実際の内容を見て確認済み。他のサイズの
+          # 生成・@capacitor/assets等の追加ツールは不要)。
+          # ここではmobile/assets/icon.png(1024x1024px, 透過なし)でその1枚を
+          # 上書きするだけで済む。Contents.json自体は変更しない。
+          ICON_SRC="mobile/assets/icon.png"
+          ICON_DEST="mobile/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png"
+          if [ ! -f "$ICON_SRC" ]; then
+            echo "error: $ICON_SRC が見つかりません" >&2
+            exit 1
+          fi
+          if [ ! -f "$ICON_DEST" ]; then
+            echo "error: $ICON_DEST が見つかりません(cap add iosのテンプレート構成が変わった可能性)" >&2
+            exit 1
+          fi
+          cp "$ICON_SRC" "$ICON_DEST"
+          file "$ICON_DEST"
+
       - name: Install CocoaPods dependencies
         script: |
           cd mobile/ios/App
