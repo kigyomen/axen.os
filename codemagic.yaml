@@ -62,6 +62,38 @@ workflows:
           cp "$ICON_SRC" "$ICON_DEST"
           file "$ICON_DEST"
 
+      - name: Apply splash screen (from mobile/assets/splash.png)
+        script: |
+          # Splash.imageset配下には、1x/2x/3x向けに3ファイルあるが、
+          # 実際にローカルでcap add iosを実行しContents.jsonを確認したところ、
+          # 3ファイルとも解像度は同一(2732x2732px)で、スケールのみ異なる
+          # (Capacitorの既定テンプレートの仕様。@capacitor/assets等の追加
+          # ツールは不要)。ここではmobile/assets/splash.png
+          # (2732x2732px, 背景#0a0a0a + ロゴ中央配置)を、3ファイルすべてに
+          # そのままコピーする。Contents.json・LaunchScreen.storyboardは
+          # 変更しない。
+          SPLASH_SRC="mobile/assets/splash.png"
+          SPLASH_DIR="mobile/ios/App/App/Assets.xcassets/Splash.imageset"
+
+          if [ ! -f "$SPLASH_SRC" ]; then
+            echo "error: $SPLASH_SRC が見つかりません" >&2
+            exit 1
+          fi
+          if [ ! -d "$SPLASH_DIR" ]; then
+            echo "error: $SPLASH_DIR が見つかりません(cap add iosのテンプレート構成が変わった可能性)" >&2
+            exit 1
+          fi
+
+          for name in splash-2732x2732.png splash-2732x2732-1.png splash-2732x2732-2.png; do
+            dest="$SPLASH_DIR/$name"
+            if [ ! -f "$dest" ]; then
+              echo "error: $dest が見つかりません(cap add iosのテンプレート構成が変わった可能性)" >&2
+              exit 1
+            fi
+            cp "$SPLASH_SRC" "$dest"
+            file "$dest"
+          done
+
       - name: Install CocoaPods dependencies
         script: |
           cd mobile/ios/App
