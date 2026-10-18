@@ -120,3 +120,19 @@ Android版アプリの設定（Settings）画面にのみ、バナー広告（Go
    で注入する。現時点では`.github/workflows/android-build.yml`はこのSecretを
    ビルドへ渡していないため、本番公開前に、Release AABをビルドするstepの`env:`
    に`ADMOB_APP_ID: ${{ secrets.ADMOB_APP_ID }}`を追加すること。
+
+### iOS版
+
+iOS版も同じSettings画面にバナー広告を表示する。AdMobではAndroidとiOSで別の
+IDが発行されるため、iOS用に以下の**2箇所**を設定する（未設定の間はGoogle公式の
+iOS用テストID（https://developers.google.com/admob/ios/test-ads）が使われる）。
+
+1. **バナー広告のAd Unit ID**（Vercelの環境変数）
+   iOS用のバナー広告ユニットIDを、Production環境の
+   `NEXT_PUBLIC_ADMOB_IOS_BANNER_AD_UNIT_ID` に設定する。
+
+2. **AdMob App ID**（Codemagicの環境変数）
+   iOS用のApp IDを、Codemagicの環境変数グループ`admob_ios`に
+   `ADMOB_IOS_APP_ID`として登録し、`codemagic.yaml`の
+   `ios-app-store-release`にある`groups:`のコメントを外す。
+   ビルド時に`Info.plist`の`GADApplicationIdentifier`へ書き込まれる。
