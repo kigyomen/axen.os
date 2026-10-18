@@ -92,8 +92,8 @@ signup確認メールのテンプレートでは`next=/`を明示的に指定し
 
 ## AdMob設定（本番環境）
 
-Android版アプリの設定（Settings）画面にのみ、バナー広告（Google AdMob）を実装
-しています。現在のコードはGoogle公式のテスト広告ID
+Android版・iOS版アプリの設定（Settings）画面にのみ、バナー広告（Google AdMob）を実装
+しています（以下はAndroid版の説明。iOS版は後述の「iOS版」を参照）。現在のコードはGoogle公式のテスト広告ID
 （https://developers.google.com/admob/android/test-ads）を既定値として使用して
 おり、本番のAdMob IDへ切り替えるまでは、実機で表示される広告はすべてテスト広告
 です（誤タップしてもGoogle広告主に課金されません）。
@@ -124,15 +124,100 @@ Android版アプリの設定（Settings）画面にのみ、バナー広告（Go
 ### iOS版
 
 iOS版も同じSettings画面にバナー広告を表示する。AdMobではAndroidとiOSで別の
-IDが発行されるため、iOS用に以下の**2箇所**を設定する（未設定の間はGoogle公式の
-iOS用テストID（https://developers.google.com/admob/ios/test-ads）が使われる）。
+IDが発行されるため、iOS用に以下の**2箇所**を設定する。
 
 1. **バナー広告のAd Unit ID**（Vercelの環境変数）
    iOS用のバナー広告ユニットIDを、Production環境の
-   `NEXT_PUBLIC_ADMOB_IOS_BANNER_AD_UNIT_ID` に設定する。
+   `NEXT_PUBLIC_ADMOB_IOS_BANNER_AD_UNIT_ID` に設定する。未設定の間は
+   Google公式のiOS用テストID（https://developers.google.com/admob/ios/test-ads）
+   が使われる。この値はWeb側の設定のため、変更するとアプリの更新なしで、
+   インストール済みのすべてのiOSアプリに即座に反映される。
 
-2. **AdMob App ID**（Codemagicの環境変数）
-   iOS用のApp IDを、Codemagicの環境変数グループ`admob_ios`に
-   `ADMOB_IOS_APP_ID`として登録し、`codemagic.yaml`の
-   `ios-app-store-release`にある`groups:`のコメントを外す。
-   ビルド時に`Info.plist`の`GADApplicationIdentifier`へ書き込まれる。
+2. **AdMob App ID**（Codemagicの環境変数グループ`admob_ios`）
+   `codemagic.yaml`の`ios-app-store-release`は、`ADMOB_IOS_APP_ID`が
+   未設定・形式が不正・Google公式のテスト用ID（`ca-app-pub-3940256099942544~`
+   で始まるもの）のいずれかの場合、最初のstepでエラーを出して停止する
+   （公開用IPAにテスト用IDが混入しないようにするため）。以下の手順で設定する。
+   1. AdMob管理画面でiOSアプリを登録し、App ID
+      （`ca-app-pub-xxxxxxxxxxxxxxxx~xxxxxxxxxx`の形式。`/`区切りの広告
+      ユニットIDとは別物）を確認する。
+   2. Codemagicで対象アプリのSettings > Environment variablesを開き、
+      Variable nameに`ADMOB_IOS_APP_ID`、Variable valueに上記App ID、
+      Groupに`admob_ios`を指定して追加する（App IDは秘密情報ではないため、
+      Secureにするかは任意）。
+   3. `codemagic.yaml`の`ios-app-store-release`にある
+      `# groups:`と`#   - admob_ios`の2行のコメントを外してコミットする。
+      グループを作る前にコメントを外すと、このworkflowはビルド開始時に
+      「unknown variable group」エラーになる（`ios-simulator-verify`は
+      このグループを参照しないため影響を受けない）。
+
+   設定した値は、ビルド時に`Info.plist`の`GADApplicationIdentifier`へ
+   書き込まれる。
+
+**順番の注意**：App IDと広告ユニットIDは同じAdMobアプリのものを使う。
+Vercel側の広告ユニットIDを本番にするのは、本番App IDでビルドしたアプリが
+公開されてからにする（App IDがテスト用のままのアプリに本番の広告ユニットIDを
+渡すと、広告が表示されない）。
+
+## App Store公開前チェックリスト（iOS版）
+
+App Store Connectへのアップロードは`codemagic.yaml`の`ios-app-store-release`
+（Codemagicダッシュボードから手動実行）で行う。以下は公開までに必要な作業の
+一覧で、**チェックが付いていない項目は未実施**。
+
+### Apple・App Store Connect
+
+- [ ] Apple Developer Programに登録する
+- [ ] Certificates, Identifiers & ProfilesでバンドルID`com.kigyoshiyo.app`を登録する
+- [ ] App Store Connectで、バンドルID`com.kigyoshiyo.app`の新規アプリを登録する
+  （未登録だと、ビルド番号を決めるstepで停止する）
+- [ ] App Store ConnectのUsers and Access > Integrationsで、App Store Connect
+  APIキー（App Manager以上の権限を推奨）を発行し、Issuer ID・Key ID・
+  .p8ファイルを控える
+
+### Codemagic
+
+- [ ] Team settings > Team integrations > Developer Portalに、上記APIキーを
+  **`kigyoshiyo_app_store_connect`という名前で**登録する（`codemagic.yaml`の
+  `integrations.app_store_connect`と一致させる）
+- [ ] Team settings > codemagic.yaml settings > Code signing identitiesに、
+  Apple Distribution証明書と、`com.kigyoshiyo.app`用のApp Store配布用
+  プロビジョニングプロファイルを登録する
+- [ ] 環境変数グループ`admob_ios`に`ADMOB_IOS_APP_ID`を登録し、
+  `codemagic.yaml`の`groups:`のコメントを外す（上記「iOS版」参照）
+
+### AdMob
+
+- [ ] AdMob管理画面でiOSアプリを登録し、本番のApp IDとバナー広告ユニットIDを発行する
+- [ ] App IDをCodemagic（`ADMOB_IOS_APP_ID`）、広告ユニットIDをVercel
+  （`NEXT_PUBLIC_ADMOB_IOS_BANNER_AD_UNIT_ID`）に設定する（上記「順番の注意」参照）
+- [ ] EEA・英国で配信する場合、AdMobの規約で求められる同意取得（Google UMP）
+  への対応を検討する（現在は未実装。配信地域を日本などに限定する方法もある）
+
+### プライバシー・審査
+
+- [ ] プライバシーポリシー（`/privacy`）の内容が、現在の実装（Google AdMob、
+  Anthropic Claude API、Supabase、Vercel）と一致しているか最終確認する
+- [ ] App Store Connectの「Appのプライバシー」で、本アプリが扱うデータと、
+  Google Mobile Ads SDKが収集するデータ（Googleが公開しているデータ開示情報を参照）
+  を申告する
+- [ ] AI Coach利用時にClaude APIへデータを送信することについて、アプリ内での
+  説明・同意の要否を確認する（App Store Reviewガイドライン5.1.2(i)。現在は
+  アプリ内の同意画面は未実装）
+- [ ] 審査用のデモアカウント（メールアドレス・パスワード）を作成し、
+  App Store Connectの「App Reviewに関する情報」に記入する
+- [ ] App Store Connectのアプリ情報に、プライバシーポリシーURLとサポートURL（`/support`）を登録する
+- [ ] 審査メモに、Webサイトの表示だけでなくネイティブ機能（ローカル通知・
+  共有など）を備えていることを記載する（ガイドライン4.2対策）
+- [ ] スクリーンショットを用意する（現在のiOSプロジェクトはiPhone・iPadの両方に
+  対応する設定のため、iPad用も必要）
+
+### ビルド・テスト
+
+- [ ] Codemagicで`ios-app-store-release`を実行し、IPAの作成とApp Store Connectへの
+  アップロードが成功することを確認する（2026年10月時点で未実施・未検証）
+- [ ] TestFlightで実機にインストールし、起動、ログイン、AI Coach、通知、共有、
+  設定画面の広告表示（クラッシュしないこと）を確認する
+- [ ] 輸出コンプライアンス（暗号化の使用）について、App Store Connectで回答する
+  （現在`Info.plist`に`ITSAppUsesNonExemptEncryption`を設定していないため、
+  ビルドごとに回答が求められる）

@@ -146,11 +146,11 @@ workflows:
         # プロビジョニングプロファイルが自動で選ばれる。
         distribution_type: app_store
         bundle_identifier: com.kigyoshiyo.app
-      # 本番のAdMob App ID(ADMOB_IOS_APP_ID)を発行したら、Codemagicで
-      # 「admob_ios」という名前の環境変数グループを作ってADMOB_IOS_APP_IDを
-      # 登録し、下の2行のコメントを外す。存在しないグループを参照すると
-      # ビルド自体が失敗するため、登録前はコメントのままにしておく
-      # (その間はGoogle公式のテスト用App IDが使われる)。
+      # 本番のAdMob App ID(ADMOB_IOS_APP_ID)は必須(未設定・テスト用IDの
+      # 場合は最初のstepでビルドを止める)。Codemagicで「admob_ios」という
+      # 名前の環境変数グループを作ってADMOB_IOS_APP_IDを登録し、下の2行の
+      # コメントを外す(手順はREADME.md参照)。存在しないグループを参照すると
+      # ビルド開始時にエラーになるため、グループ作成前はコメントのままにしておく。
       # groups:
       #   - admob_ios
       vars:
@@ -159,6 +159,30 @@ workflows:
         BUNDLE_ID: "com.kigyoshiyo.app"
 
     scripts:
+      - name: Check AdMob production App ID (ADMOB_IOS_APP_ID)
+        script: |
+          set -euo pipefail
+          # 公開用ビルドにテスト用のAdMob App IDが混入しないよう、時間のかかる
+          # 処理より前に確認し、問題があればここで止める。
+          if [ -z "${ADMOB_IOS_APP_ID:-}" ]; then
+            echo "error: ADMOB_IOS_APP_ID が設定されていません。" >&2
+            echo "  Codemagicで環境変数グループ「admob_ios」を作ってADMOB_IOS_APP_ID(本番のAdMob App ID)を登録し、" >&2
+            echo "  codemagic.yamlのios-app-store-releaseにあるgroups:のコメントを外してください(README.md参照)。" >&2
+            exit 1
+          fi
+          # App ID(~区切り)と広告ユニットID(/区切り)の取り違えを防ぐ。
+          if ! echo "$ADMOB_IOS_APP_ID" | grep -Eq '^ca-app-pub-[0-9]{16}~[0-9]{10}$'; then
+            echo "error: ADMOB_IOS_APP_ID の形式が正しくありません(ca-app-pub-XXXXXXXXXXXXXXXX~XXXXXXXXXX の形式で指定してください)" >&2
+            exit 1
+          fi
+          # ca-app-pub-3940256099942544 はGoogle公式のテスト用ID専用の
+          # パブリッシャーID(https://developers.google.com/admob/ios/test-ads)。
+          if echo "$ADMOB_IOS_APP_ID" | grep -q '^ca-app-pub-3940256099942544~'; then
+            echo "error: ADMOB_IOS_APP_ID にGoogle公式のテスト用App IDが設定されています。公開用ビルドには本番のApp IDを設定してください。" >&2
+            exit 1
+          fi
+          echo "ADMOB_IOS_APP_ID: OK"
+
       - name: Install Capacitor dependencies (mobile/)
         script: |
           cd mobile
@@ -218,25 +242,13 @@ workflows:
           # 無いと初期化時にアプリを強制終了させる。iOSプロジェクトはビルドの
           # たびにcap add iosで生成されるため、ここで毎回書き込む。
           #
-          # ADMOB_IOS_APP_IDが未設定の場合は、Google公式のテスト用App ID
-          # (https://developers.google.com/admob/ios/test-ads)を使う。
-          # テスト用IDのままでも広告はテスト広告として表示されるだけで、
-          # 本番IDとしては扱わない。
+          # 値(本番のApp ID)は最初のstepで検証済み。
           PLIST="mobile/ios/App/App/Info.plist"
-          TEST_ADMOB_IOS_APP_ID="ca-app-pub-3940256099942544~1458002511"
-          APP_ID="${ADMOB_IOS_APP_ID:-$TEST_ADMOB_IOS_APP_ID}"
+          APP_ID="$ADMOB_IOS_APP_ID"
 
           if [ ! -f "$PLIST" ]; then
             echo "error: $PLIST が見つかりません(cap add iosのテンプレート構成が変わった可能性)" >&2
             exit 1
-          fi
-          # App ID(~区切り)と広告ユニットID(/区切り)の取り違えを防ぐ。
-          if ! echo "$APP_ID" | grep -Eq '^ca-app-pub-[0-9]{16}~[0-9]{10}$'; then
-            echo "error: ADMOB_IOS_APP_ID の形式が正しくありません(ca-app-pub-XXXXXXXXXXXXXXXX~XXXXXXXXXX の形式で指定してください)" >&2
-            exit 1
-          fi
-          if [ "$APP_ID" = "$TEST_ADMOB_IOS_APP_ID" ]; then
-            echo "warning: ADMOB_IOS_APP_ID が未設定のため、テスト用のAdMob App IDでビルドします(本番公開前に設定すること)"
           fi
 
           /usr/libexec/PlistBuddy -c "Delete :GADApplicationIdentifier" "$PLIST" 2>/dev/null || true
