@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { buildCoachSystemPrompt } from "@/lib/anthropic/system-prompt";
 import { splitCoachStreamText } from "@/lib/coach/actions-schema";
+import { AI_COACH_CONSENT_REQUIRED_CODE, hasAiCoachConsent } from "@/lib/coach/consent";
 import { streamCoachReply } from "@/lib/coach/provider";
 import { getCurrentUser } from "@/lib/supabase/get-current-user";
 import { getCurrentBusiness } from "@/lib/supabase/business";
 import { getCoachContext } from "@/lib/supabase/coach-context";
+import { getCurrentProfile } from "@/lib/supabase/profile";
 import {
   countTodayUserMessages,
   DAILY_MESSAGE_LIMIT,
@@ -24,11 +26,30 @@ const MAX_MESSAGE_LENGTH = 4000;
  * このパスはsrc/proxy.tsの保護対象に含めていない(リダイレクトはfetch
  * クライアントに不向きなため)。代わりにこの関数内で自前の認証チェックを行い、
  * 未ログインの場合は401 JSONを返す。
+ *
+ * 外部AI(Anthropic Claude API)へのデータ送信への同意も、クライアントの
+ * 申告ではなくDB(profiles.ai_coach_consented_at/ai_coach_consent_version)の
+ * 値でここで検証する。同意が無い・確認できない場合は、メッセージの保存や
+ * Claude APIの呼び出しより前に403を返す。
  */
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "ログインが必要です" }, { status: 401 });
+  }
+
+  // getCurrentProfile()は取得失敗時にnullを返し、hasAiCoachConsent(null)は
+  // falseになるため、DBエラー時も同意なしとして扱う(送信側に倒さない)。
+  const profile = await getCurrentProfile();
+  if (!hasAiCoachConsent(profile)) {
+    return NextResponse.json(
+      {
+        error:
+          "AI Coachを利用するには、外部AIサービスへのデータ送信への同意が必要です。",
+        code: AI_COACH_CONSENT_REQUIRED_CODE,
+      },
+      { status: 403 },
+    );
   }
 
   let body: unknown;

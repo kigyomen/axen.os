@@ -1,4 +1,6 @@
 import { CoachChat } from "@/components/coach/CoachChat";
+import { CoachConsentPanel } from "@/components/coach/CoachConsentPanel";
+import { hasAiCoachConsent } from "@/lib/coach/consent";
 import { resolveCoachCharacter } from "@/lib/coach/characters";
 import { getCurrentBusiness } from "@/lib/supabase/business";
 import { getCoachMessages } from "@/lib/supabase/coach-messages";
@@ -28,6 +30,13 @@ export default async function CoachPage({
         </p>
       </div>
     );
+  }
+
+  // 外部AIへのデータ送信に(現在の版の説明文で)同意していない場合は、
+  // チャットの代わりに説明・同意画面を表示する。これは表示上の制御で、
+  // 実際の送信可否は/api/coachがDBの同意状態で必ず再確認する。
+  if (!hasAiCoachConsent(profile)) {
+    return <CoachConsentPanel />;
   }
 
   // key={business.id}: CoachChatはストリーミング中の会話を保持するため

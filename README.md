@@ -201,9 +201,15 @@ App Store Connectへのアップロードは`codemagic.yaml`の`ios-app-store-re
 - [ ] App Store Connectの「Appのプライバシー」で、本アプリが扱うデータと、
   Google Mobile Ads SDKが収集するデータ（Googleが公開しているデータ開示情報を参照）
   を申告する
-- [ ] AI Coach利用時にClaude APIへデータを送信することについて、アプリ内での
-  説明・同意の要否を確認する（App Store Reviewガイドライン5.1.2(i)。現在は
-  アプリ内の同意画面は未実装）
+- [ ] AI CoachのClaude APIへのデータ送信への同意（App Store Reviewガイドライン
+  5.1.2(i)対応）のため、`supabase/migrations/007_ai_coach_consent.sql`を本番の
+  Supabaseに適用する（Dashboard > SQL Editorで実行。未適用のままこのコードを
+  デプロイすると、同意を保存できず、全員がAI Coachを利用できなくなる）。
+  適用前に、使い捨てのデータベースで`supabase/tests/002_ai_coach_consent.sql`を
+  実行して確認できる。同意画面はAI Coachの初回利用時に表示され、設定画面から
+  取り消せる
+- [ ] 本番環境で、AI Coachの同意 → 送信 → 設定画面からの取り消し → 送信が
+  拒否される、の流れを確認する（ローカルの検証用データベースでのみ確認済み）
 - [ ] 審査用のデモアカウント（メールアドレス・パスワード）を作成し、
   App Store Connectの「App Reviewに関する情報」に記入する
 - [ ] App Store Connectのアプリ情報に、プライバシーポリシーURLとサポートURL（`/support`）を登録する
