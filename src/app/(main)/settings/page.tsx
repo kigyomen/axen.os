@@ -6,6 +6,7 @@ import { SectionHeader } from "@/components/ui/SectionHeader";
 import { AdBanner } from "@/components/capacitor/AdBanner";
 import { ChangePasswordForm } from "@/components/settings/ChangePasswordForm";
 import { CoachCharacterForm } from "@/components/settings/CoachCharacterForm";
+import { CoachConsentSettings } from "@/components/settings/CoachConsentSettings";
 import { DeleteAccountButton } from "@/components/settings/DeleteAccountButton";
 import { LogoutButton } from "@/components/settings/LogoutButton";
 import { NotificationSettingsForm } from "@/components/settings/NotificationSettingsForm";
@@ -64,8 +65,11 @@ export default async function SettingsPage({
 
       <section>
         <SectionHeader title="AIコーチ" />
-        <Card>
+        <Card className="flex flex-col gap-5">
           <CoachCharacterForm profile={profile} />
+          <div className="border-t border-border pt-4">
+            <CoachConsentSettings profile={profile} />
+          </div>
         </Card>
       </section>
 

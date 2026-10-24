@@ -30,6 +30,13 @@ export interface Profile {
   notification_time: string;
   /** 選択中のAIコーチの性格。DB側がNOT NULL+DEFAULTのため常に値を持つ。 */
   coach_character: CoachCharacterId;
+  /**
+   * AI Coachの外部AIへのデータ送信に、現在有効な同意をした日時。
+   * 未同意・取り消し後はnull(記録はai_coach_consent_eventsテーブル)。
+   */
+  ai_coach_consented_at: string | null;
+  /** 同意した説明文の版。現在の版(AI_COACH_CONSENT_VERSION)と異なれば未同意扱い。 */
+  ai_coach_consent_version: string | null;
   created_at: string;
   updated_at: string;
 }

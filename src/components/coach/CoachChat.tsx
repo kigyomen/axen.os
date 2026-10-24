@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowDown, Send } from "lucide-react";
 import { suggestedPrompts } from "@/lib/mock-data";
 import { ActionSuggestions } from "@/components/coach/ActionSuggestions";
@@ -13,6 +14,7 @@ import {
   splitCoachStreamText,
   type CoachActions,
 } from "@/lib/coach/actions-schema";
+import { AI_COACH_CONSENT_REQUIRED_CODE } from "@/lib/coach/consent";
 import type { CoachCharacterId, CoachMessage } from "@/lib/supabase/types";
 
 /** stateを持つ側でのみ使う型。propsを増やしすぎないよう最小限にする。 */
@@ -44,6 +46,7 @@ function toChatMessage(message: CoachMessage): ChatMessage {
 
 export function CoachChat({ initialMessages, initialInput, coachCharacterId }: CoachChatProps) {
   const character = resolveCoachCharacter(coachCharacterId);
+  const router = useRouter();
   const [messages, setMessages] = useState<ChatMessage[]>(
     initialMessages.map(toChatMessage),
   );
@@ -121,6 +124,11 @@ export function CoachChat({ initialMessages, initialInput, coachCharacterId }: C
         try {
           const data = await res.json();
           if (typeof data?.error === "string") error = data.error;
+          // 別の端末で同意を取り消した場合など、サーバー側で同意が確認できない
+          // ときは、ページを再取得して説明・同意画面に切り替える。
+          if (res.status === 403 && data?.code === AI_COACH_CONSENT_REQUIRED_CODE) {
+            router.refresh();
+          }
         } catch {
           // JSONで返らなかった場合はデフォルトのエラー文言を使う
         }

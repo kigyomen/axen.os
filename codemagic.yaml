@@ -113,3 +113,217 @@ workflows:
 
     artifacts:
       - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
+
+  ios-app-store-release:
+    name: iOS App Store Release (signed IPA → App Store Connect)
+    # 「起業しよ。」iOS版を、App Store配布用の署名付きIPAとしてビルドし、
+    # App Store Connectへアップロードするworkflow。
+    #
+    # - 上のios-simulator-verifyとは独立している(あちらは署名なしの
+    #   ビルド検証専用のため、そのまま残している)。アイコン・スプラッシュの
+    #   反映手順は、あちらと同じ内容をこちらにも持たせている。
+    # - Appleの認証情報(App Store Connect APIキー・配布証明書・
+    #   プロビジョニングプロファイル)は、このファイルには一切書かない。
+    #   すべてCodemagicのTeam設定に登録したものを名前で参照する
+    #   (integrations.app_store_connect / environment.ios_signing)。
+    # - 自動トリガーは設定していない(Codemagicダッシュボードから手動実行)。
+    # - アップロードのみ行い、TestFlightの外部テストやApp Store審査への
+    #   提出は自動では行わない(App Store Connect上で手動で行う)。
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    integrations:
+      # Codemagic > Team settings > Team integrations > Developer Portal に
+      # 登録したApp Store Connect APIキーの「名前」。キー本体はCodemagic側に
+      # 保管され、ビルド時にAPP_STORE_CONNECT_*環境変数として渡される。
+      app_store_connect: kigyoshiyo_app_store_connect
+    environment:
+      node: 22
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        # Codemagic > Team settings > codemagic.yaml settings >
+        # Code signing identities に登録した、App Store配布用の証明書と
+        # プロビジョニングプロファイルが自動で選ばれる。
+        distribution_type: app_store
+        bundle_identifier: com.kigyoshiyo.app
+      # 本番のAdMob App ID(ADMOB_IOS_APP_ID)は必須(未設定・テスト用IDの
+      # 場合は最初のstepでビルドを止める)。Codemagicで「admob_ios」という
+      # 名前の環境変数グループを作ってADMOB_IOS_APP_IDを登録し、下の2行の
+      # コメントを外す(手順はREADME.md参照)。存在しないグループを参照すると
+      # ビルド開始時にエラーになるため、グループ作成前はコメントのままにしておく。
+      # groups:
+      #   - admob_ios
+      vars:
+        XCODE_WORKSPACE: "mobile/ios/App/App.xcworkspace"
+        XCODE_SCHEME: "App"
+        BUNDLE_ID: "com.kigyoshiyo.app"
+
+    scripts:
+      - name: Check AdMob production App ID (ADMOB_IOS_APP_ID)
+        script: |
+          set -euo pipefail
+          # 公開用ビルドにテスト用のAdMob App IDが混入しないよう、時間のかかる
+          # 処理より前に確認し、問題があればここで止める。
+          if [ -z "${ADMOB_IOS_APP_ID:-}" ]; then
+            echo "error: ADMOB_IOS_APP_ID が設定されていません。" >&2
+            echo "  Codemagicで環境変数グループ「admob_ios」を作ってADMOB_IOS_APP_ID(本番のAdMob App ID)を登録し、" >&2
+            echo "  codemagic.yamlのios-app-store-releaseにあるgroups:のコメントを外してください(README.md参照)。" >&2
+            exit 1
+          fi
+          # App ID(~区切り)と広告ユニットID(/区切り)の取り違えを防ぐ。
+          if ! echo "$ADMOB_IOS_APP_ID" | grep -Eq '^ca-app-pub-[0-9]{16}~[0-9]{10}$'; then
+            echo "error: ADMOB_IOS_APP_ID の形式が正しくありません(ca-app-pub-XXXXXXXXXXXXXXXX~XXXXXXXXXX の形式で指定してください)" >&2
+            exit 1
+          fi
+          # ca-app-pub-3940256099942544 はGoogle公式のテスト用ID専用の
+          # パブリッシャーID(https://developers.google.com/admob/ios/test-ads)。
+          if echo "$ADMOB_IOS_APP_ID" | grep -q '^ca-app-pub-3940256099942544~'; then
+            echo "error: ADMOB_IOS_APP_ID にGoogle公式のテスト用App IDが設定されています。公開用ビルドには本番のApp IDを設定してください。" >&2
+            exit 1
+          fi
+          echo "ADMOB_IOS_APP_ID: OK"
+
+      - name: Install Capacitor dependencies (mobile/)
+        script: |
+          cd mobile
+          npm ci
+
+      - name: Add iOS platform (npx cap add ios)
+        script: |
+          cd mobile
+          # ios-simulator-verifyと同じく、CocoaPods(Podfile)を前提にする。
+          npx cap add ios --packagemanager CocoaPods
+
+      - name: Apply app icon (from mobile/assets/icon.png)
+        script: |
+          # ios-simulator-verifyの同名stepと同じ処理(詳細はそちらのコメント参照)。
+          ICON_SRC="mobile/assets/icon.png"
+          ICON_DEST="mobile/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png"
+          if [ ! -f "$ICON_SRC" ]; then
+            echo "error: $ICON_SRC が見つかりません" >&2
+            exit 1
+          fi
+          if [ ! -f "$ICON_DEST" ]; then
+            echo "error: $ICON_DEST が見つかりません(cap add iosのテンプレート構成が変わった可能性)" >&2
+            exit 1
+          fi
+          cp "$ICON_SRC" "$ICON_DEST"
+          file "$ICON_DEST"
+
+      - name: Apply splash screen (from mobile/assets/splash.png)
+        script: |
+          # ios-simulator-verifyの同名stepと同じ処理(詳細はそちらのコメント参照)。
+          SPLASH_SRC="mobile/assets/splash.png"
+          SPLASH_DIR="mobile/ios/App/App/Assets.xcassets/Splash.imageset"
+
+          if [ ! -f "$SPLASH_SRC" ]; then
+            echo "error: $SPLASH_SRC が見つかりません" >&2
+            exit 1
+          fi
+          if [ ! -d "$SPLASH_DIR" ]; then
+            echo "error: $SPLASH_DIR が見つかりません(cap add iosのテンプレート構成が変わった可能性)" >&2
+            exit 1
+          fi
+
+          for name in splash-2732x2732.png splash-2732x2732-1.png splash-2732x2732-2.png; do
+            dest="$SPLASH_DIR/$name"
+            if [ ! -f "$dest" ]; then
+              echo "error: $dest が見つかりません(cap add iosのテンプレート構成が変わった可能性)" >&2
+              exit 1
+            fi
+            cp "$SPLASH_SRC" "$dest"
+            file "$dest"
+          done
+
+      - name: Configure AdMob in Info.plist
+        script: |
+          set -euo pipefail
+          # Google Mobile Ads SDKは、Info.plistにGADApplicationIdentifierが
+          # 無いと初期化時にアプリを強制終了させる。iOSプロジェクトはビルドの
+          # たびにcap add iosで生成されるため、ここで毎回書き込む。
+          #
+          # 値(本番のApp ID)は最初のstepで検証済み。
+          PLIST="mobile/ios/App/App/Info.plist"
+          APP_ID="$ADMOB_IOS_APP_ID"
+
+          if [ ! -f "$PLIST" ]; then
+            echo "error: $PLIST が見つかりません(cap add iosのテンプレート構成が変わった可能性)" >&2
+            exit 1
+          fi
+
+          /usr/libexec/PlistBuddy -c "Delete :GADApplicationIdentifier" "$PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :GADApplicationIdentifier string $APP_ID" "$PLIST"
+
+          # SKAdNetworkItems: Google Mobile Ads SDKのiOS導入手順、および
+          # @capacitor-community/admobのREADMEで追加が求められている
+          # Google自身のSKAdNetwork ID。無くても広告は表示されるが、
+          # 広告効果の計測ができず収益に影響する。
+          /usr/libexec/PlistBuddy -c "Delete :SKAdNetworkItems" "$PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :SKAdNetworkItems array" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :SKAdNetworkItems:0 dict" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :SKAdNetworkItems:0:SKAdNetworkIdentifier string cstr6suwn9.skadnetwork" "$PLIST"
+
+          # NSUserTrackingUsageDescription(ATTの許可ダイアログ)は追加しない。
+          # アプリ側(src/lib/capacitor/admob.ts)はATTの許可を求めておらず
+          # (requestTrackingAuthorizationを呼んでいない)、IDFAによる
+          # トラッキングを行わない設計のため。
+
+          plutil -lint "$PLIST"
+          /usr/libexec/PlistBuddy -c "Print :GADApplicationIdentifier" "$PLIST"
+
+      - name: Set build number (App Store Connect latest + 1)
+        script: |
+          set -euo pipefail
+          # App Store Connectに登録済みの最新ビルド番号(TestFlight・App Store
+          # の両方、全バージョン)を取得し、+1した値をCFBundleVersionに設定する。
+          # 認証はintegrationsのAPIキーを使う。
+          PLIST="mobile/ios/App/App/Info.plist"
+          APP_STORE_APP_ID=$(app-store-connect apps list \
+            --bundle-id-identifier "$BUNDLE_ID" \
+            --strict-match-identifier \
+            --json | jq -r '.[0].id // empty')
+          if [ -z "$APP_STORE_APP_ID" ]; then
+            echo "error: App Store Connectに $BUNDLE_ID のアプリが見つかりません(先にApp Store Connectでアプリを登録してください)" >&2
+            exit 1
+          fi
+
+          LATEST_BUILD_NUMBER=$(app-store-connect get-latest-build-number "$APP_STORE_APP_ID" \
+            --platform IOS \
+            --all-versions)
+          # まだ1件もアップロードしていない場合は何も出力されないため0扱い。
+          LATEST_BUILD_NUMBER="${LATEST_BUILD_NUMBER:-0}"
+          if ! echo "$LATEST_BUILD_NUMBER" | grep -Eq '^[0-9]+$'; then
+            echo "error: 最新のビルド番号が整数ではありません: $LATEST_BUILD_NUMBER" >&2
+            exit 1
+          fi
+          NEW_BUILD_NUMBER=$((LATEST_BUILD_NUMBER + 1))
+
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $NEW_BUILD_NUMBER" "$PLIST"
+          echo "Build number: $LATEST_BUILD_NUMBER -> $NEW_BUILD_NUMBER"
+
+      - name: Install CocoaPods dependencies
+        script: |
+          cd mobile/ios/App
+          pod install
+
+      - name: Set up code signing
+        script: |
+          # ios_signingで取得した証明書・プロファイルをXcodeプロジェクトに適用する。
+          xcode-project use-profiles
+
+      - name: Build signed IPA for App Store
+        script: |
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: false
+        submit_to_app_store: false
