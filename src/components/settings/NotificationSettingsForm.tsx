@@ -19,10 +19,10 @@ const fieldClass =
   "rounded-xl border border-border bg-surface-muted px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20";
 
 /**
- * タスク/目標期限のローカル通知(Android)のON/OFF・通知時刻を設定するフォーム。
+ * タスク/目標期限のローカル通知(iOS・Androidアプリ)のON/OFF・通知時刻を設定するフォーム。
  *
- * 保存自体(updateNotificationPreferences)はWeb/Androidどちらでも行える
- * (単なるprofilesの設定値)。保存が成功した後、Androidネイティブ環境でのみ
+ * 保存自体(updateNotificationPreferences)はWeb/アプリどちらでも行える
+ * (単なるprofilesの設定値)。保存が成功した後、ネイティブ環境(iOS・Android)でのみ
  * 通知権限の確認・端末への再スケジュール(rescheduleReminders)を行う
  * (Web版では保存のみで端末側の動作は発生しない)。
  */
@@ -61,7 +61,7 @@ export function NotificationSettingsForm({ profile }: { profile: Profile | null 
         <div>
           <p className="text-sm font-medium text-foreground">タスク・目標のリマインダー</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            期限が近いタスク・目標を、指定した時刻に端末へ通知します(Android版のみ)。
+            期限が近いタスク・目標を、指定した時刻に端末へ通知します(iPhone・Androidのアプリ版のみ。Web版では通知されません)。
           </p>
         </div>
         <label className="relative inline-flex cursor-pointer items-center">
@@ -97,7 +97,7 @@ export function NotificationSettingsForm({ profile }: { profile: Profile | null 
       {state.success ? <p className="text-sm text-green-400">保存しました。</p> : null}
       {permissionDenied ? (
         <p className="text-sm text-amber-400">
-          端末の通知が許可されていないため、通知は届きません。Androidの設定アプリから
+          端末の通知が許可されていないため、通知は届きません。端末の「設定」アプリから
           「起業しよ。」の通知を許可してください。
         </p>
       ) : null}

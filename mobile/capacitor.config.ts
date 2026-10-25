@@ -29,6 +29,11 @@ const config: CapacitorConfig = {
       showSpinner: false,
       androidScaleType: "CENTER_CROP",
     },
+    LocalNotifications: {
+      // iOSのみで使われる設定(Androidでは無視される)。アプリを前面に
+      // 表示中でも、ローカル通知をバナー・通知センター・音で知らせる。
+      presentationOptions: ["banner", "list", "sound"],
+    },
   },
 };
 

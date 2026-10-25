@@ -72,14 +72,74 @@ export async function cancelAllReminders(): Promise<void> {
 }
 
 /**
+ * 一度に予約するリマインダー通知の上限。iOSは予約中のローカル通知を
+ * 発火の近い順に64件までしか保持しないため、それに合わせる
+ * (Androidにも予約数の上限があるため、OS共通の上限とする)。
+ */
+export const MAX_SCHEDULED_REMINDERS = 64;
+
+export interface PlannedReminder {
+  id: number;
+  title: string;
+  body: string;
+  at: Date;
+}
+
+/**
+ * 予約すべきリマインダーを決める(端末APIを呼ばない純粋な処理)。
+ *
+ * - 発火時刻は「ユーザーが設定した時刻」を期限日(due_date/target_date)に
+ *   適用した、端末ローカル時刻
+ * - 発火時刻が既に過去(now以前)のものは除く(過去時刻を予約すると
+ *   即座に発火する可能性があるため)
+ * - 発火の近い順に並べ(同時刻は元の並び=タスク→目標の順を保つ)、
+ *   通知IDが重複するものは近い方だけを残し、先頭からmaxCount件に絞る
+ */
+export function planReminders(
+  data: NotificationScheduleData,
+  now: number,
+  maxCount: number = MAX_SCHEDULED_REMINDERS,
+): PlannedReminder[] {
+  const candidates = [
+    ...data.taskReminders.map((t) => ({
+      key: `task:${t.id}`,
+      title: "タスクの期限です",
+      body: t.title,
+      at: toLocalDate(t.date, data.time),
+    })),
+    ...data.goalReminders.map((g) => ({
+      key: `goal:${g.id}`,
+      title: "目標の期限です",
+      body: g.title,
+      at: toLocalDate(g.date, data.time),
+    })),
+  ]
+    .filter((n): n is typeof n & { at: Date } => n.at !== null && n.at.getTime() > now)
+    .sort((a, b) => a.at.getTime() - b.at.getTime());
+
+  const usedIds = new Set<number>();
+  const planned: PlannedReminder[] = [];
+  for (const n of candidates) {
+    if (planned.length >= maxCount) {
+      break;
+    }
+    const id = hashToNotificationId(n.key);
+    if (usedIds.has(id)) {
+      continue;
+    }
+    usedIds.add(id);
+    planned.push({ id, title: n.title, body: n.body, at: n.at });
+  }
+  return planned;
+}
+
+/**
  * タスク/目標のリマインダー通知を、現在のデータに合わせて再スケジュールする。
  * 既存の予約をすべて取り消してから積み直すため、何度呼んでも重複しない。
  *
  * - 通知OFF、または通知権限が未許可の場合は取り消すだけで何も積まない
- * - 期限日の時刻が既に過去の場合はスキップする(過去時刻を予約すると
- *   即座に発火する可能性があるため)
- * - 発火時刻は「ユーザーが設定した時刻」を期限日(due_date/target_date)に
- *   適用した、端末ローカル時刻
+ * - 予約する内容・件数はplanReminders()で決める(期限の近い順に最大
+ *   MAX_SCHEDULED_REMINDERS件)
  */
 export async function rescheduleReminders(data: NotificationScheduleData): Promise<void> {
   if (!Capacitor.isNativePlatform()) {
@@ -97,31 +157,13 @@ export async function rescheduleReminders(data: NotificationScheduleData): Promi
     return;
   }
 
-  const now = Date.now();
-  const notifications = [
-    ...data.taskReminders.map((t) => ({
-      kind: "task" as const,
-      id: `task:${t.id}`,
-      title: "タスクの期限です",
-      body: t.title,
-      at: toLocalDate(t.date, data.time),
-    })),
-    ...data.goalReminders.map((g) => ({
-      kind: "goal" as const,
-      id: `goal:${g.id}`,
-      title: "目標の期限です",
-      body: g.title,
-      at: toLocalDate(g.date, data.time),
-    })),
-  ]
-    .filter((n): n is typeof n & { at: Date } => n.at !== null && n.at.getTime() > now)
-    .map((n) => ({
-      id: hashToNotificationId(n.id),
-      title: n.title,
-      body: n.body,
-      schedule: { at: n.at, allowWhileIdle: true },
-      isExactNotification: false,
-    }));
+  const notifications = planReminders(data, Date.now()).map((n) => ({
+    id: n.id,
+    title: n.title,
+    body: n.body,
+    schedule: { at: n.at, allowWhileIdle: true },
+    isExactNotification: false,
+  }));
 
   if (notifications.length === 0) {
     return;
