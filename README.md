@@ -133,7 +133,7 @@ IDが発行されるため、iOS用に以下の**2箇所**を設定する。
    が使われる。この値はWeb側の設定のため、変更するとアプリの更新なしで、
    インストール済みのすべてのiOSアプリに即座に反映される。
 
-2. **AdMob App ID**（Codemagicの環境変数グループ`admob_ios`）
+2. **AdMob App ID**（Codemagicの環境変数グループ`ios_admob_config`）
    `codemagic.yaml`の`ios-app-store-release`は、`ADMOB_IOS_APP_ID`が
    未設定・形式が不正・Google公式のテスト用ID（`ca-app-pub-3940256099942544~`
    で始まるもの）のいずれかの場合、最初のstepでエラーを出して停止する
@@ -143,13 +143,13 @@ IDが発行されるため、iOS用に以下の**2箇所**を設定する。
       ユニットIDとは別物）を確認する。
    2. Codemagicで対象アプリのSettings > Environment variablesを開き、
       Variable nameに`ADMOB_IOS_APP_ID`、Variable valueに上記App ID、
-      Groupに`admob_ios`を指定して追加する（App IDは秘密情報ではないため、
+      Groupに`ios_admob_config`を指定して追加する（App IDは秘密情報ではないため、
       Secureにするかは任意）。
-   3. `codemagic.yaml`の`ios-app-store-release`にある
-      `# groups:`と`#   - admob_ios`の2行のコメントを外してコミットする。
-      グループを作る前にコメントを外すと、このworkflowはビルド開始時に
-      「unknown variable group」エラーになる（`ios-simulator-verify`は
-      このグループを参照しないため影響を受けない）。
+   3. `codemagic.yaml`の`ios-app-store-release`は、`groups:`で
+      `ios_admob_config`を読み込む設定になっている（変更は不要）。
+      Codemagicにこの名前のグループが無い、または名前が一致しないと、
+      このworkflowはビルド開始時に「unknown variable group」エラーになる
+      （`ios-simulator-verify`はこのグループを参照しないため影響を受けない）。
 
    設定した値は、ビルド時に`Info.plist`の`GADApplicationIdentifier`へ
    書き込まれる。
@@ -183,8 +183,8 @@ App Store Connectへのアップロードは`codemagic.yaml`の`ios-app-store-re
 - [ ] Team settings > codemagic.yaml settings > Code signing identitiesに、
   Apple Distribution証明書と、`com.kigyoshiyo.app`用のApp Store配布用
   プロビジョニングプロファイルを登録する
-- [ ] 環境変数グループ`admob_ios`に`ADMOB_IOS_APP_ID`を登録し、
-  `codemagic.yaml`の`groups:`のコメントを外す（上記「iOS版」参照）
+- [ ] 環境変数グループ`ios_admob_config`に`ADMOB_IOS_APP_ID`を登録する
+  （`codemagic.yaml`の`groups:`はこのグループを読み込む設定済み。上記「iOS版」参照）
 
 ### AdMob
 

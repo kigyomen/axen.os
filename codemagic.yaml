@@ -147,12 +147,12 @@ workflows:
         distribution_type: app_store
         bundle_identifier: com.kigyoshiyo.app
       # 本番のAdMob App ID(ADMOB_IOS_APP_ID)は必須(未設定・テスト用IDの
-      # 場合は最初のstepでビルドを止める)。Codemagicで「admob_ios」という
-      # 名前の環境変数グループを作ってADMOB_IOS_APP_IDを登録し、下の2行の
-      # コメントを外す(手順はREADME.md参照)。存在しないグループを参照すると
-      # ビルド開始時にエラーになるため、グループ作成前はコメントのままにしておく。
-      # groups:
-      #   - admob_ios
+      # 場合は最初のstepでビルドを止める)。Codemagicに登録済みの環境変数
+      # グループ「ios_admob_config」からADMOB_IOS_APP_IDを読み込む
+      # (手順はREADME.md参照)。存在しないグループを参照するとビルド開始時に
+      # エラーになるため、グループ名はCodemagic側の登録名と一致させること。
+      groups:
+        - ios_admob_config
       vars:
         XCODE_WORKSPACE: "mobile/ios/App/App.xcworkspace"
         XCODE_SCHEME: "App"
@@ -166,8 +166,8 @@ workflows:
           # 処理より前に確認し、問題があればここで止める。
           if [ -z "${ADMOB_IOS_APP_ID:-}" ]; then
             echo "error: ADMOB_IOS_APP_ID が設定されていません。" >&2
-            echo "  Codemagicで環境変数グループ「admob_ios」を作ってADMOB_IOS_APP_ID(本番のAdMob App ID)を登録し、" >&2
-            echo "  codemagic.yamlのios-app-store-releaseにあるgroups:のコメントを外してください(README.md参照)。" >&2
+            echo "  Codemagicの環境変数グループ「ios_admob_config」に、ADMOB_IOS_APP_ID(本番のAdMob App ID)を" >&2
+            echo "  登録してください(グループ名・変数名の綴りも確認してください。README.md参照)。" >&2
             exit 1
           fi
           # App ID(~区切り)と広告ユニットID(/区切り)の取り違えを防ぐ。
