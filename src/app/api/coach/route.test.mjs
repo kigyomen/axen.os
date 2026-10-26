@@ -68,7 +68,18 @@ mock.module(srcUrl("lib/anthropic/client.ts"), {
               async *[Symbol.asyncIterator]() {
                 yield { type: "content_block_delta", delta: { type: "text_delta", text: "こんにちは。" } };
               },
-              finalMessage: async () => ({ content: [] }),
+              finalMessage: async () => ({
+                id: "msg_test",
+                type: "message",
+                role: "assistant",
+                model: "test-model",
+                content: [
+                  { type: "text", text: "こんにちは。", citations: null },
+                ],
+                stop_reason: "end_turn",
+                stop_sequence: null,
+                usage: { input_tokens: 10, output_tokens: 5 },
+              }),
             };
           },
         },
