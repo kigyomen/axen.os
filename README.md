@@ -178,7 +178,7 @@ App Store Connectへのアップロードは`codemagic.yaml`の`ios-app-store-re
 ### Codemagic
 
 - [ ] Team settings > Team integrations > Developer Portalに、上記APIキーを
-  **`kigyoshiyo_app_store_connect`という名前で**登録する（`codemagic.yaml`の
+  **`Kigyoshiyo Apple Developer`という名前で**登録する（`codemagic.yaml`の
   `integrations.app_store_connect`と一致させる）
 - [ ] Team settings > codemagic.yaml settings > Code signing identitiesに、
   Apple Distribution証明書と、`com.kigyoshiyo.app`用のApp Store配布用
