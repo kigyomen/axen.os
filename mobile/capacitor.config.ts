@@ -21,6 +21,13 @@ const config: CapacitorConfig = {
     cleartext: false,
     androidScheme: "https",
   },
+  ios: {
+    // CapacitorのiOS既定(false)では、拡大が始まった瞬間にピンチ操作の受け付けを
+    // 無効化し、その後元に戻さない。小さい文字の入力欄をタップした際のiOSの
+    // 自動拡大などをきっかけに、以後すべての画面でピンチ操作が効かなくなるため、
+    // 拡大・縮小を許可する(iOSのみ。Androidには影響しない)。
+    zoomEnabled: true,
+  },
   plugins: {
     SplashScreen: {
       launchShowDuration: 600,
