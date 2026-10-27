@@ -1,6 +1,12 @@
 @import "tailwindcss";
 
 /*
+ * スマートフォン・タブレットの横向き(タッチ操作が主の端末)だけに効かせる
+ * バリアント。PC(マウス操作)のレイアウトには影響しない。
+ */
+@custom-variant landscape-touch (@media (orientation: landscape) and (pointer: coarse));
+
+/*
  * 「起業しよ。」ブランドカラー / デザイントークン
  *
  * ライトテーマ(白〜薄いグレーをベースに、Primaryカラーを意味のある

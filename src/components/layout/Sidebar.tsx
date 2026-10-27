@@ -7,8 +7,12 @@ import { navItems } from "@/lib/nav-items";
 export function Sidebar() {
   const pathname = usePathname();
 
+  // スマートフォン横向きでは、ページ(右側のメイン)をスクロールしてもSidebarが
+  // 一緒に流れないよう、セーフエリアの上端に固定し(sticky)、画面の高さに収まらない
+  // 場合はSidebarだけを独立してスクロールさせる。高さは、bodyのセーフエリア余白
+  // (globals.css)を除いた、実際に見えている範囲(dvh)に合わせる。
   return (
-    <aside className="hidden w-60 shrink-0 border-r border-border md:flex md:flex-col md:gap-1.5 md:px-3 md:py-6">
+    <aside className="hidden w-60 shrink-0 border-r border-border md:flex md:flex-col md:gap-1.5 md:px-3 md:py-6 landscape-touch:sticky landscape-touch:top-[env(safe-area-inset-top)] landscape-touch:h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] landscape-touch:self-start landscape-touch:overflow-y-auto landscape-touch:overscroll-contain">
       <div className="mb-7 px-3">
         <span className="text-lg font-semibold tracking-tight text-foreground">
           起業しよ。
