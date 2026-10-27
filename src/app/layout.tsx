@@ -24,6 +24,10 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  // iOSアプリ(Capacitor)のWebViewは画面全体(ステータスバー・ノッチの裏)まで
+  // 広がっており、coverを指定しないとenv(safe-area-inset-*)が常に0になる。
+  // 余白はglobals.cssのbody等でenv()を使って確保する(PC等ではenv()=0で変化なし)。
+  viewportFit: "cover",
   // 初回ペイント時点(JS実行前)の既定値。実際の選択テーマへの反映は
   // ThemeScript(hydration前に同期実行)とThemeProvider(切り替え時)が担う。
   themeColor: [
