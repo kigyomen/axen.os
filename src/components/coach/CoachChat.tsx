@@ -264,7 +264,7 @@ export function CoachChat({ initialMessages, initialInput, coachCharacterId }: C
       </div>
 
       {!isAtBottom ? (
-        <div className="sticky bottom-36 z-10 flex justify-end md:bottom-20">
+        <div className="sticky bottom-[calc(9rem+env(safe-area-inset-bottom))] z-10 flex justify-end md:bottom-[calc(5rem+env(safe-area-inset-bottom))]">
           <button
             type="button"
             onClick={() => scrollToBottom()}
@@ -278,7 +278,7 @@ export function CoachChat({ initialMessages, initialInput, coachCharacterId }: C
 
       <form
         onSubmit={handleSubmit}
-        className="sticky bottom-20 mt-2 flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5 transition-colors focus-within:border-primary/40 md:bottom-4"
+        className="sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] mt-2 flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5 transition-colors focus-within:border-primary/40 md:bottom-[calc(1rem+env(safe-area-inset-bottom))]"
       >
         <input
           type="text"
