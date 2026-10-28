@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AndroidBackButtonHandler } from "@/components/capacitor/AndroidBackButtonHandler";
-import { ViewportDebug } from "@/components/debug/ViewportDebug";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { ThemeScript } from "@/components/theme/ThemeScript";
 import { THEME_COLOR_DARK, THEME_COLOR_LIGHT } from "@/lib/theme";
@@ -53,7 +52,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <ThemeProvider>
           <AndroidBackButtonHandler />
           {children}
-          <ViewportDebug />
         </ThemeProvider>
       </body>
     </html>
