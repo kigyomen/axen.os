@@ -6,6 +6,9 @@ import { login, type AuthActionState } from "@/lib/supabase/actions";
 
 const initialState: AuthActionState = { error: null };
 
+// メールアドレス・パスワード欄の文字は16px(text-base)にする。iOSは16px未満の
+// 入力欄にフォーカスすると画面を自動で拡大し、再ログイン後もその倍率が残るため
+// (行の高さは従来と同じ20pxに固定し、入力欄の高さは変えない)。
 export function LoginForm() {
   const [state, formAction, isPending] = useActionState(login, initialState);
 
@@ -21,7 +24,7 @@ export function LoginForm() {
           type="email"
           autoComplete="email"
           required
-          className="rounded-xl border border-border bg-surface-muted px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+          className="rounded-xl border border-border bg-surface-muted px-4 py-2.5 text-base/5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
           placeholder="you@example.com"
         />
       </div>
@@ -44,7 +47,7 @@ export function LoginForm() {
           type="password"
           autoComplete="current-password"
           required
-          className="rounded-xl border border-border bg-surface-muted px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+          className="rounded-xl border border-border bg-surface-muted px-4 py-2.5 text-base/5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
           placeholder="••••••••"
         />
       </div>
