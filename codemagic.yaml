@@ -195,6 +195,29 @@ workflows:
           # ios-simulator-verifyと同じく、CocoaPods(Podfile)を前提にする。
           npx cap add ios --packagemanager CocoaPods
 
+      - name: Make the app iPhone-only (TARGETED_DEVICE_FAMILY = 1)
+        script: |
+          set -euo pipefail
+          # cap add iosが生成するAppターゲットはDebug・Releaseとも
+          # TARGETED_DEVICE_FAMILY = "1,2"(iPhone・iPad)のため、App Storeで
+          # iPhone専用として配布できるよう、両方を1(iPhoneのみ)に書き換える。
+          PBXPROJ="mobile/ios/App/App.xcodeproj/project.pbxproj"
+          if [ ! -f "$PBXPROJ" ]; then
+            echo "error: $PBXPROJ が見つかりません(cap add iosのテンプレート構成が変わった可能性)" >&2
+            exit 1
+          fi
+          perl -pi -e 's/TARGETED_DEVICE_FAMILY = "1,2";/TARGETED_DEVICE_FAMILY = 1;/g' "$PBXPROJ"
+          if grep -q 'TARGETED_DEVICE_FAMILY = "' "$PBXPROJ"; then
+            echo "error: iPhone専用(1)以外のTARGETED_DEVICE_FAMILYが残っています" >&2
+            grep -n 'TARGETED_DEVICE_FAMILY' "$PBXPROJ" >&2
+            exit 1
+          fi
+          if [ "$(grep -c 'TARGETED_DEVICE_FAMILY = 1;' "$PBXPROJ")" -lt 2 ]; then
+            echo "error: Debug・Release両方のTARGETED_DEVICE_FAMILYを確認できません(cap add iosのテンプレート構成が変わった可能性)" >&2
+            exit 1
+          fi
+          grep -n 'TARGETED_DEVICE_FAMILY' "$PBXPROJ"
+
       - name: Apply app icon (from mobile/assets/icon.png)
         script: |
           # ios-simulator-verifyの同名stepと同じ処理(詳細はそちらのコメント参照)。

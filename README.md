@@ -215,8 +215,9 @@ App Store Connectへのアップロードは`codemagic.yaml`の`ios-app-store-re
 - [ ] App Store Connectのアプリ情報に、プライバシーポリシーURLとサポートURL（`/support`）を登録する
 - [ ] 審査メモに、Webサイトの表示だけでなくネイティブ機能（ローカル通知・
   共有など）を備えていることを記載する（ガイドライン4.2対策）
-- [ ] スクリーンショットを用意する（現在のiOSプロジェクトはiPhone・iPadの両方に
-  対応する設定のため、iPad用も必要）
+- [ ] iPhone用のスクリーンショットを用意する（App Store Connectで必須と表示される
+  iPhoneの画面サイズ分）。`codemagic.yaml`の`ios-app-store-release`でiPhone専用
+  （`TARGETED_DEVICE_FAMILY = 1`）にしているため、iPad用は不要
 
 ### ビルド・テスト
 
