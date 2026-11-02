@@ -1,20 +1,21 @@
-# Founder（仮称）
+# 起業しよ。
 
 アイデアを、実際のビジネスに変えるためのAIビジネス支援アプリ。
 起業志望者・学生起業家・副業を始めたい人・個人事業主・小規模事業者を対象とする。
 
-## 現在のフェーズ
+現在の実装状況・環境変数・デプロイ方法・既知の不具合などの詳細は、
+[HANDOVER.md](./HANDOVER.md)を参照。
 
-**Phase 1: 基盤 + UI（仮データ）**
+## 現在の実装
 
-Next.js + TypeScript + Tailwind CSS で、以下5画面のUIのみを実装済み。
-バックエンド・Supabase連携・認証・AI APIは未実装（仮データで表示）。
+Web版（Vercel）と、Capacitorで本番のWeb版を表示するiOS・Androidアプリ（`mobile/`）。
 
-- Dashboard
-- Business Ideas
-- Tasks
-- Finance（Sales / Expenses / Profit）
-- AI Business Coach（チャットUIのみ、送信不可）
+- 新規登録・ログイン・パスワード再設定（Supabase Auth）
+- 初回ヒアリング・事業の作成と切り替え
+- Dashboard / Ideas / Tasks / Finance（売上・経費、CSV書き出し）/ Goals / スタートガイド
+- AI Coach（Anthropic Claude API。外部AIへのデータ送信への同意が必要）
+- 設定（プロフィール、テーマ、通知、パスワード変更、アカウント削除）
+- アプリ版のみ: ローカル通知、共有、設定画面のバナー広告（Google AdMob）
 
 ## 技術スタック
 
@@ -22,8 +23,9 @@ Next.js + TypeScript + Tailwind CSS で、以下5画面のUIのみを実装済�
 - TypeScript
 - Tailwind CSS
 - lucide-react（アイコン）
-- Supabase（Phase 2以降で導入予定）
-- AI機能（Phase 3以降で導入予定）
+- Supabase（DB / Auth）
+- Anthropic Claude API（AI Coach）
+- Capacitor（iOS / Android）
 
 ## セットアップ
 
@@ -42,13 +44,6 @@ npm run build   # 本番ビルド
 npm run start   # 本番サーバー起動
 npm run lint    # ESLint実行
 ```
-
-## 今後の実装予定
-
-- Supabase（DB / Auth）
-- 各画面のCRUD・データ永続化
-- AI Business Coach（AI API接続）
-Vercel deployment test
 
 ## Supabase Auth設定（本番環境）
 
@@ -117,9 +112,9 @@ Android版・iOS版アプリの設定（Settings）画面にのみ、バナー�
    署名用Secrets、`ANDROID_KEYSTORE_BASE64`等と同じ場所）。
    `mobile/android/app/build.gradle`がビルド時にこの環境変数を読み込み、
    `mobile/android/app/src/main/AndroidManifest.xml`へmanifest placeholder経由
-   で注入する。現時点では`.github/workflows/android-build.yml`はこのSecretを
-   ビルドへ渡していないため、本番公開前に、Release AABをビルドするstepの`env:`
-   に`ADMOB_APP_ID: ${{ secrets.ADMOB_APP_ID }}`を追加すること。
+   で注入する。`.github/workflows/android-build.yml`の「Build Release AAB」stepは
+   `env:`で`ADMOB_APP_ID: ${{ secrets.ADMOB_APP_ID }}`をビルドへ渡している
+   （Secretが未設定の場合は、`build.gradle`の既定値であるGoogle公式のテスト用App IDが使われる）。
 
 ### iOS版
 
@@ -167,29 +162,29 @@ App Store Connectへのアップロードは`codemagic.yaml`の`ios-app-store-re
 
 ### Apple・App Store Connect
 
-- [ ] Apple Developer Programに登録する
-- [ ] Certificates, Identifiers & ProfilesでバンドルID`com.kigyoshiyo.app`を登録する
-- [ ] App Store Connectで、バンドルID`com.kigyoshiyo.app`の新規アプリを登録する
+- [x] Apple Developer Programに登録する
+- [x] Certificates, Identifiers & ProfilesでバンドルID`com.kigyoshiyo.app`を登録する
+- [x] App Store Connectで、バンドルID`com.kigyoshiyo.app`の新規アプリを登録する
   （未登録だと、ビルド番号を決めるstepで停止する）
-- [ ] App Store ConnectのUsers and Access > Integrationsで、App Store Connect
+- [x] App Store ConnectのUsers and Access > Integrationsで、App Store Connect
   APIキー（App Manager以上の権限を推奨）を発行し、Issuer ID・Key ID・
   .p8ファイルを控える
 
 ### Codemagic
 
-- [ ] Team settings > Team integrations > Developer Portalに、上記APIキーを
+- [x] Team settings > Team integrations > Developer Portalに、上記APIキーを
   **`Kigyoshiyo Apple Developer`という名前で**登録する（`codemagic.yaml`の
   `integrations.app_store_connect`と一致させる）
-- [ ] Team settings > codemagic.yaml settings > Code signing identitiesに、
+- [x] Team settings > codemagic.yaml settings > Code signing identitiesに、
   Apple Distribution証明書と、`com.kigyoshiyo.app`用のApp Store配布用
   プロビジョニングプロファイルを登録する
-- [ ] 環境変数グループ`ios_admob_config`に`ADMOB_IOS_APP_ID`を登録する
+- [x] 環境変数グループ`ios_admob_config`に`ADMOB_IOS_APP_ID`を登録する
   （`codemagic.yaml`の`groups:`はこのグループを読み込む設定済み。上記「iOS版」参照）
 
 ### AdMob
 
-- [ ] AdMob管理画面でiOSアプリを登録し、本番のApp IDとバナー広告ユニットIDを発行する
-- [ ] App IDをCodemagic（`ADMOB_IOS_APP_ID`）、広告ユニットIDをVercel
+- [x] AdMob管理画面でiOSアプリを登録し、本番のApp IDとバナー広告ユニットIDを発行する
+- [x] App IDをCodemagic（`ADMOB_IOS_APP_ID`）、広告ユニットIDをVercel
   （`NEXT_PUBLIC_ADMOB_IOS_BANNER_AD_UNIT_ID`）に設定する（上記「順番の注意」参照）
 - [ ] EEA・英国で配信する場合、AdMobの規約で求められる同意取得（Google UMP）
   への対応を検討する（現在は未実装。配信地域を日本などに限定する方法もある）
@@ -201,7 +196,7 @@ App Store Connectへのアップロードは`codemagic.yaml`の`ios-app-store-re
 - [ ] App Store Connectの「Appのプライバシー」で、本アプリが扱うデータと、
   Google Mobile Ads SDKが収集するデータ（Googleが公開しているデータ開示情報を参照）
   を申告する
-- [ ] AI CoachのClaude APIへのデータ送信への同意（App Store Reviewガイドライン
+- [x] AI CoachのClaude APIへのデータ送信への同意（App Store Reviewガイドライン
   5.1.2(i)対応）のため、`supabase/migrations/007_ai_coach_consent.sql`を本番の
   Supabaseに適用する（Dashboard > SQL Editorで実行。未適用のままこのコードを
   デプロイすると、同意を保存できず、全員がAI Coachを利用できなくなる）。
@@ -221,8 +216,8 @@ App Store Connectへのアップロードは`codemagic.yaml`の`ios-app-store-re
 
 ### ビルド・テスト
 
-- [ ] Codemagicで`ios-app-store-release`を実行し、IPAの作成とApp Store Connectへの
-  アップロードが成功することを確認する（2026年10月時点で未実施・未検証）
+- [x] Codemagicで`ios-app-store-release`を実行し、IPAの作成とApp Store Connectへの
+  アップロードが成功することを確認する
 - [ ] TestFlightで実機にインストールし、起動、ログイン、AI Coach、通知、共有、
   設定画面の広告表示（クラッシュしないこと）を確認する
 - [ ] 輸出コンプライアンス（暗号化の使用）について、App Store Connectで回答する
