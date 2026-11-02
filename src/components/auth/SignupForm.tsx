@@ -5,6 +5,8 @@ import { signup, type AuthActionState } from "@/lib/supabase/actions";
 
 const initialState: AuthActionState = { error: null };
 
+// 入力欄の文字は16px(text-base)にする。iOSは16px未満の入力欄にフォーカスすると
+// 画面を自動で拡大するため(行の高さは従来と同じ20pxに固定し、入力欄の高さは変えない)。
 export function SignupForm() {
   const [state, formAction, isPending] = useActionState(signup, initialState);
   const [password, setPassword] = useState("");
@@ -32,7 +34,7 @@ export function SignupForm() {
           type="email"
           autoComplete="email"
           required
-          className="rounded-xl border border-border bg-surface-muted px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+          className="rounded-xl border border-border bg-surface-muted px-4 py-2.5 text-base/5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
           placeholder="you@example.com"
         />
       </div>
@@ -50,7 +52,7 @@ export function SignupForm() {
           minLength={6}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="rounded-xl border border-border bg-surface-muted px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+          className="rounded-xl border border-border bg-surface-muted px-4 py-2.5 text-base/5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
           placeholder="6文字以上"
         />
       </div>
@@ -68,7 +70,7 @@ export function SignupForm() {
           minLength={6}
           value={passwordConfirm}
           onChange={(e) => setPasswordConfirm(e.target.value)}
-          className="rounded-xl border border-border bg-surface-muted px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+          className="rounded-xl border border-border bg-surface-muted px-4 py-2.5 text-base/5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
           placeholder="もう一度入力"
         />
         {passwordMismatch ? (
