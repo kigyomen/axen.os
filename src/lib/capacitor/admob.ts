@@ -72,15 +72,22 @@ function ensureInitialized(): Promise<void> {
 /**
  * Settings画面専用のバナー広告を表示する。
  * Capacitor.isNativePlatform()がfalseの場合(Web版)は何もしない。
+ *
+ * onDebugは、広告が表示されない原因を調べるための一時的な診断表示
+ * (AdBanner.tsx)用。各段階と失敗理由を渡す(広告IDそのものは渡さない)。
  */
-export async function showSettingsBannerAd(): Promise<void> {
+export async function showSettingsBannerAd(onDebug?: (message: string) => void): Promise<void> {
   const bannerAd = Capacitor.isNativePlatform() ? resolveBannerAd() : null;
   if (!bannerAd) {
     return;
   }
 
   try {
+    onDebug?.("initialize: 開始");
     await ensureInitialized();
+    onDebug?.(
+      `showBanner: 呼び出し(isTesting=${bannerAd.isTesting}、本番の広告ユニットID=${bannerAd.isTesting ? "未設定" : "設定あり"})`,
+    );
     await AdMob.showBanner({
       adId: bannerAd.adId,
       isTesting: bannerAd.isTesting,
@@ -88,8 +95,10 @@ export async function showSettingsBannerAd(): Promise<void> {
       position: BannerAdPosition.BOTTOM_CENTER,
       margin: BOTTOM_NAV_CLEARANCE_DP,
     });
+    onDebug?.("showBanner: 完了(広告の読み込み結果を待っています)");
   } catch (err) {
     console.error("showSettingsBannerAd failed", err);
+    onDebug?.(`エラー: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
