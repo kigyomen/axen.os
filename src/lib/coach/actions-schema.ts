@@ -253,9 +253,11 @@ export function computeStreamingDisplayText(rawText: string): string {
 export const PROPOSE_ACTIONS_TOOL: Anthropic.Tool = {
   name: "propose_actions",
   description:
-    "ユーザーへの返答の中で、タスク・目標・事業アイデアとして追加できる具体的な提案をした場合にだけ呼び出す。" +
+    "ユーザーへの返答の文章を書き終えた後、毎回の返答の最後に1回だけ呼び出す。" +
     "通常の会話の返答はこのツールとは別に、必ず自然な文章で行う(このツールは返答の代わりにはならない)。" +
-    "はっきりした行動・目標・アイデアの提案がない場合は呼び出さない。" +
+    "tasks/goals/ideasには、返答の中でタスク・目標・事業アイデアとして追加できる具体的な提案をした場合だけ" +
+    "候補を入れ、はっきりした提案がない場合は空配列にする。" +
+    "follow_up_questionsには、直前のやり取りを踏まえてユーザーが次に聞きたくなりそうな質問を3つ入れる。" +
     "期限(due_date/target_date)は、ユーザーまたはあなた自身が「今週中」「明日まで」のように文章中で明確な期限に" +
     "言及した場合のみYYYY-MM-DD形式で設定し、年月日が具体的に定まらない曖昧な表現の場合は絶対に推測で日付を" +
     "作らず省略すること。",
@@ -308,6 +310,47 @@ export const PROPOSE_ACTIONS_TOOL: Anthropic.Tool = {
           required: ["title"],
         },
       },
+      follow_up_questions: {
+        type: "array",
+        description:
+          "ユーザーが次にそのまま送信できる質問の候補を3つ。直前のやり取りの内容に沿った具体的なものにし、" +
+          "ユーザー自身の言葉(「〜を教えて」「〜はどうすればいい?」等)で、それぞれ40文字以内の1文にする。",
+        items: { type: "string" },
+      },
     },
   },
 };
+
+/** 会話の流れに応じた「次の質問」候補の最大件数・最大文字数。 */
+export const MAX_FOLLOW_UP_QUESTIONS = 3;
+const MAX_FOLLOW_UP_QUESTION_LENGTH = 60;
+
+/**
+ * Claudeが返した「次の質問」候補(propose_actionsツールのfollow_up_questions)を検証する。
+ * 文字列以外・空・長すぎるもの・重複は捨て、最大3件までにする。
+ * 形式が想定外の場合は空配列を返し、画面側は固定の質問例にフォールバックする。
+ */
+export function sanitizeFollowUpQuestions(raw: unknown): string[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const questions: string[] = [];
+  for (const item of raw) {
+    if (typeof item !== "string") {
+      continue;
+    }
+    const question = item.replace(/\s+/g, " ").trim();
+    if (
+      question.length === 0 ||
+      question.length > MAX_FOLLOW_UP_QUESTION_LENGTH ||
+      questions.includes(question)
+    ) {
+      continue;
+    }
+    questions.push(question);
+    if (questions.length >= MAX_FOLLOW_UP_QUESTIONS) {
+      break;
+    }
+  }
+  return questions;
+}

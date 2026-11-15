@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState } from "react";
 import { createTask, updateTask, type TaskActionState } from "@/lib/supabase/task-actions";
 import { CategoryPicker } from "@/components/ui/CategoryPicker";
 import { DEFAULT_TASK_CATEGORY, TASK_CATEGORY_SUGGESTIONS } from "@/lib/task-categories";
@@ -34,13 +34,19 @@ export function TaskForm({
   initialValues?: TaskFormInitialValues;
 }) {
   const action = task ? updateTask : createTask;
-  const [state, formAction, isPending] = useActionState(action, initialState);
-
-  useEffect(() => {
-    if (state.success) {
-      onDone();
-    }
-  }, [state.success, onDone]);
+  // 保存に成功したら、その場でonDone()を呼ぶ(呼び出し元がモーダルを閉じ、完了通知を出す)。
+  // 画面の再描画を待ってからuseEffectで呼ぶ方式だと、一覧が空の状態から最初の1件を
+  // 追加したときなどにフォームが作り直され、onDone()が呼ばれずモーダルが残ってしまうため。
+  const [state, formAction, isPending] = useActionState(
+    async (prevState: typeof initialState, formData: FormData) => {
+      const result = await action(prevState, formData);
+      if (result.success) {
+        onDone();
+      }
+      return result;
+    },
+    initialState,
+  );
 
   return (
     <form action={formAction} className="flex flex-col gap-4">

@@ -1,11 +1,12 @@
 "use client";
 
 import { ArrowDownRight, ArrowUpRight, Download, Plus, Pencil, Trash2, Wallet } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { Bar } from "@/components/ui/Bar";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
+import { Toast } from "@/components/ui/Toast";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatCard } from "@/components/ui/StatCard";
 import { formatYen } from "@/lib/finance";
@@ -29,6 +30,16 @@ type ModalState =
 
 export function FinanceClient({ sales, expenses }: { sales: Sale[]; expenses: Expense[] }) {
   const [modal, setModal] = useState<ModalState>(null);
+  // 追加が完了したときの通知。keyを変えて、続けて追加したときも表示時間をやり直す。
+  const [toast, setToast] = useState<{ key: number; message: string } | null>(null);
+  const dismissToast = useCallback(() => setToast(null), []);
+  const handleCreated = useCallback(() => {
+    setModal(null);
+    setToast({ key: Date.now(), message: "取引を記録しました！" });
+  }, []);
+  const toastElement = toast ? (
+    <Toast key={toast.key} message={toast.message} onDismiss={dismissToast} />
+  ) : null;
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
@@ -219,7 +230,7 @@ export function FinanceClient({ sales, expenses }: { sales: Sale[]; expenses: Ex
 
       {modal?.type === "create" ? (
         <Modal title="取引を追加" onClose={() => setModal(null)}>
-          <TransactionForm onDone={() => setModal(null)} />
+          <TransactionForm onDone={handleCreated} />
         </Modal>
       ) : null}
 
@@ -235,6 +246,7 @@ export function FinanceClient({ sales, expenses }: { sales: Sale[]; expenses: Ex
       {modal?.type === "delete" ? (
         <DeleteTransactionModal entry={modal.entry} onClose={() => setModal(null)} />
       ) : null}
+      {toastElement}
     </div>
   );
 }

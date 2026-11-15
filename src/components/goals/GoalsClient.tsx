@@ -2,6 +2,7 @@
 
 import { Minus, Plus, Pencil, Target, Trash2 } from "lucide-react";
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -12,6 +13,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Bar } from "@/components/ui/Bar";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
+import { Toast } from "@/components/ui/Toast";
 import { getDisplayGoalStatus, goalStatusLabel, goalStatusTone, goalTypeLabel } from "@/lib/goal-status";
 import { calcGoalProgress } from "@/lib/supabase/finance";
 import { adjustGoalCurrentValue } from "@/lib/supabase/goal-actions";
@@ -27,6 +29,16 @@ type ModalState =
 
 export function GoalsClient({ goals }: { goals: Goal[] }) {
   const [modal, setModal] = useState<ModalState>(null);
+  // 追加が完了したときの通知。keyを変えて、続けて追加したときも表示時間をやり直す。
+  const [toast, setToast] = useState<{ key: number; message: string } | null>(null);
+  const dismissToast = useCallback(() => setToast(null), []);
+  const handleCreated = useCallback(() => {
+    setModal(null);
+    setToast({ key: Date.now(), message: "ゴールを登録しました！" });
+  }, []);
+  const toastElement = toast ? (
+    <Toast key={toast.key} message={toast.message} onDismiss={dismissToast} />
+  ) : null;
 
   // 保存されているstatusではなく、自動達成判定込みの表示ステータスで
   // 振り分ける。これにより、current_valueがtarget_value以上になり
@@ -62,9 +74,10 @@ export function GoalsClient({ goals }: { goals: Goal[] }) {
 
         {modal?.type === "create" ? (
           <Modal title="目標を追加" onClose={() => setModal(null)}>
-            <GoalForm onDone={() => setModal(null)} />
+            <GoalForm onDone={handleCreated} />
           </Modal>
         ) : null}
+        {toastElement}
       </>
     );
   }
@@ -126,7 +139,7 @@ export function GoalsClient({ goals }: { goals: Goal[] }) {
 
       {modal?.type === "create" ? (
         <Modal title="目標を追加" onClose={() => setModal(null)}>
-          <GoalForm onDone={() => setModal(null)} />
+          <GoalForm onDone={handleCreated} />
         </Modal>
       ) : null}
 
@@ -139,6 +152,7 @@ export function GoalsClient({ goals }: { goals: Goal[] }) {
       {modal?.type === "delete" ? (
         <DeleteGoalModal goal={modal.goal} onClose={() => setModal(null)} />
       ) : null}
+      {toastElement}
     </div>
   );
 }
