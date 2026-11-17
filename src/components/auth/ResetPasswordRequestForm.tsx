@@ -7,10 +7,17 @@ const initialState: AuthActionState = { error: null };
 
 // 入力欄の文字は16px(text-base)にする。iOSは16px未満の入力欄にフォーカスすると
 // 画面を自動で拡大するため(行の高さは従来と同じ20pxに固定し、入力欄の高さは変えない)。
+/**
+ * メール内リンクの処理に失敗した理由(src/app/auth/confirm/route.tsが?error=で渡す)。
+ * - expired: リンクが無効・期限切れ・使用済み
+ * - other_browser: 再設定を申し込んだのと別のブラウザでリンクを開いた
+ */
+export type ResetLinkError = "expired" | "other_browser";
+
 export function ResetPasswordRequestForm({
-  linkExpired = false,
+  linkError = null,
 }: {
-  linkExpired?: boolean;
+  linkError?: ResetLinkError | null;
 }) {
   const [state, formAction, isPending] = useActionState(requestPasswordReset, initialState);
 
@@ -24,10 +31,23 @@ export function ResetPasswordRequestForm({
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
-      {linkExpired ? (
+      {linkError === "expired" ? (
         <p role="alert" className="text-sm text-red-400">
           リンクが無効か、有効期限が切れています。お手数ですが、もう一度お試しください。
         </p>
+      ) : null}
+      {linkError === "other_browser" ? (
+        <div role="alert" className="flex flex-col gap-1.5 text-sm leading-relaxed text-red-400">
+          <p>
+            安全のため、再設定用のリンクは「再設定を申し込んだときと同じブラウザ」で開く必要があります。
+          </p>
+          <p>
+            このブラウザでもう一度メールアドレスを入力して再設定を申し込み、届いたメールのリンクを同じブラウザ(例: Safari)で開いてください。メールアプリ内で開いた場合は、リンクを長押しして「Safariで開く」を選んでください。
+          </p>
+          <p>
+            会員登録の確認メールのリンクだった場合は、ログイン画面からログインをお試しください。
+          </p>
+        </div>
       ) : null}
 
       <div className="flex flex-col gap-1.5">

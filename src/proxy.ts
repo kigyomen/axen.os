@@ -33,6 +33,32 @@ function isAuthPath(pathname: string) {
   return AUTH_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
 }
 
+/**
+ * Supabase標準のメールテンプレートのリンクが、?code=...付きで戻ってくることがあるページ。
+ * - /update-password: 以前のパスワード再設定メール(redirectToが/update-passwordだった頃)
+ * - /: redirectToが許可されなかった場合にSupabaseが使うSite URL
+ * どちらもログインが必要なページのため、そのままではログイン画面へ戻されてしまう。
+ * codeを処理できる/auth/confirmへ、クエリをそのまま引き継いで転送する。
+ */
+const CODE_LINK_FALLBACK_PATHS = ["/", "/update-password"];
+
+function buildCodeLinkRedirect(request: NextRequest): NextResponse | null {
+  const { pathname, searchParams } = request.nextUrl;
+  if (!CODE_LINK_FALLBACK_PATHS.includes(pathname) || !searchParams.has("code")) {
+    return null;
+  }
+  const redirectUrl = request.nextUrl.clone();
+  redirectUrl.pathname = "/auth/confirm";
+  // 遷移先(next)は固定値のみを使う(外部サイトへのリダイレクトを防ぐため、
+  // 元のURLのnextは引き継がない)。パスワード再設定のリンクかどうかは
+  // /auth/confirm側で判定し、再設定なら必ず/update-passwordへ進む。
+  redirectUrl.searchParams.delete("next");
+  if (pathname === "/update-password") {
+    redirectUrl.searchParams.set("next", "/update-password");
+  }
+  return NextResponse.redirect(redirectUrl);
+}
+
 /** レスポンス間でリフレッシュ後のCookieを引き継ぐ */
 function copyCookies(from: NextResponse, to: NextResponse) {
   from.cookies.getAll().forEach((cookie) => {
@@ -56,6 +82,11 @@ export async function proxy(request: NextRequest) {
 
   if (!hasSupabaseEnv) {
     return NextResponse.next();
+  }
+
+  const codeLinkRedirect = buildCodeLinkRedirect(request);
+  if (codeLinkRedirect) {
+    return codeLinkRedirect;
   }
 
   const { response, user } = await updateSession(request);
