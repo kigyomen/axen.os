@@ -23,9 +23,9 @@ function resolveSourceFile(base) {
 
 registerHooks({
   resolve(specifier, context, nextResolve) {
-    // next/serverはpackage.jsonのexportsが無いため、拡張子付きで解決する
-    if (specifier === "next/server") {
-      return nextResolve("next/server.js", context);
+    // next/server・next/navigationはpackage.jsonのexportsが無いため、拡張子付きで解決する
+    if (specifier === "next/server" || specifier === "next/navigation") {
+      return nextResolve(`${specifier}.js`, context);
     }
 
     let base = null;

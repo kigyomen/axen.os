@@ -180,7 +180,8 @@ async function getOrigin(): Promise<string> {
  * 追加しない(メールアドレスの存在を第三者に明示しないため)。
  *
  * リセットリンクはsrc/app/auth/confirm/route.tsで検証し、
- * /update-password へ遷移させる。
+ * /update-password へ遷移させる(Supabase標準のメールテンプレートのリンクは、
+ * このredirectToへ?code=...付きで戻ってくる)。
  */
 export async function requestPasswordReset(
   _prevState: AuthActionState,
@@ -195,7 +196,7 @@ export async function requestPasswordReset(
   const origin = await getOrigin();
   const supabase = await createClient();
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origin}/update-password`,
+    redirectTo: `${origin}/auth/confirm?next=/update-password`,
   });
 
   if (error) {

@@ -236,6 +236,14 @@ node --import ./src/test-support/register-alias.mjs --experimental-test-module-m
 10. アプリは起動のたびに本番の Web を読み込むが、通信できないときの代わりの画面（Capacitor の `server.errorPath`）は設定していない。圏外・機内モードで起動したときの表示を実機で確認すること。
 11. アプリのバージョン（`MARKETING_VERSION`）は、`cap add ios` のひな形の `1.0` のまま。Codemagic はビルド番号だけを自動で増やす。2回目以降のアップデートでは、バージョンを上げる手順が必要。
 12. メールの確認リンク・パスワード再設定リンクは、アプリではなく Safari で開く（アプリへのリンクの設定は無い）。手続き後にアプリでログインし直す流れになる。
+13. **iPhoneアプリから申し込んだパスワード再設定が完了できない**（未対応の課題）
+   - Supabase 標準のメールテンプレート（編集できない）のリンクは `?code=...`（PKCE方式）で戻ってくる。`/auth/confirm` で `exchangeCodeForSession` により処理するよう対応済み。
+   - ただしPKCE方式は、再設定を申し込んだのと**同じブラウザ**でリンクを開いたときだけ成功する（検証用の値が申し込んだブラウザのCookieにあるため）。
+   - iPhoneアプリで申し込み、Safariやメールアプリでリンクを開いた場合は失敗する。このときは「同じブラウザで申し込み直す」案内を表示している（`/reset-password?error=other_browser`）。
+   - 確実に直す方法の候補:
+     - メールテンプレートを token_hash 形式に書き換える（README参照。テンプレートを編集できるようになった場合）
+     - アプリへのリンク（Universal Links）を設定し、アプリ内でリンクを開く
+   - implicit方式（URLにトークンを含める方式）は採用しない方針。
 
 ---
 
