@@ -21,30 +21,21 @@ const LINK_EXPIRED_PATH = "/reset-password?error=expired";
 const LINK_OTHER_BROWSER_PATH = "/reset-password?error=other_browser";
 
 /**
- * オープンリダイレクト対策: nextクエリパラメータは「このサイト内部への
- * 相対パス」である場合のみ許可する。
- *
- * - "/"で始まらない値(https://example.com、javascript:...等の絶対URL/
- *   scheme付きURLは"/"で始まらないため、ここで弾かれる)
- * - "//evil.example.com"のようなprotocol-relative URL("//"で始まる)
- * - "/\evil.example.com"のようなバックスラッシュを使った回避策
- *   (一部のブラウザ/プロキシが"\"を"/"として正規化し、実質的に
- *   protocol-relative URLとして扱われることがあるため)
- * のいずれかに該当する場合は無効とみなし、安全なデフォルト遷移先を返す。
- * URLSearchParams#get()は既にパーセントエンコードをデコード済みの値を返すため、
- * "%2F%2Fevil.example.com"のようなエンコードによる回避もここで検出できる。
+ * メール内リンクのnextクエリパラメータで許可する遷移先(完全一致)。
+ * 実際に使っているのは、会員登録の確認後の"/"と、パスワード再設定後の
+ * "/update-password"の2つだけ(README.mdのメールテンプレート、actions.tsのredirectTo)。
+ */
+const ALLOWED_NEXT_PATHS = new Set(["/", "/update-password"]);
+
+/**
+ * オープンリダイレクト対策: nextは上記の許可リストと完全一致する場合だけ使い、
+ * それ以外はすべて安全なデフォルト遷移先にする。
+ * 文字列の形を調べる方式だと、タブ・改行(ブラウザが無視するため"/\t/evil"が
+ * "//evil"として扱われる)やバックスラッシュ等による回避を見落とすおそれがあるため、
+ * 許可する値を列挙する方式にしている。
  */
 function resolveSafeNextPath(rawNext: string | null): string {
-  if (!rawNext) {
-    return DEFAULT_NEXT_PATH;
-  }
-  if (!rawNext.startsWith("/")) {
-    return DEFAULT_NEXT_PATH;
-  }
-  if (rawNext.startsWith("//") || rawNext.startsWith("/\\")) {
-    return DEFAULT_NEXT_PATH;
-  }
-  return rawNext;
+  return rawNext && ALLOWED_NEXT_PATHS.has(rawNext) ? rawNext : DEFAULT_NEXT_PATH;
 }
 
 /**

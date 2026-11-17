@@ -146,6 +146,40 @@ test("token_hash形式: 外部サイトへのnextは拒否し、既定の/update
   );
 });
 
+// タブ・改行・バックスラッシュ・エンコードされた"//"による回避の試み
+// (URLに書かれる形のまま。URLSearchParamsがデコードしてからnextとして扱われる)。
+const BYPASS_NEXT_VALUES = ["/%09/evil", "/%0A/evil", "/%5Cevil", "/%2F%2Fevil"];
+
+test("token_hash形式: 回避用のnextはすべて拒否し、既定の/update-passwordへ進む", async () => {
+  state.verifyResult = { error: null };
+  for (const next of BYPASS_NEXT_VALUES) {
+    assert.equal(
+      await redirectedTo(`?token_hash=th&type=signup&next=${next}`),
+      "/update-password",
+      next,
+    );
+  }
+});
+
+test("code形式(再設定以外): 回避用のnextはすべて拒否し、既定の/update-passwordへ進む", async () => {
+  state.exchangeResult = { data: { ...SESSION_DATA, redirectType: null }, error: null };
+  for (const next of BYPASS_NEXT_VALUES) {
+    assert.equal(await redirectedTo(`?code=abc&next=${next}`), "/update-password", next);
+  }
+});
+
+test("許可リストにある/と/update-passwordは、そのまま使う", async () => {
+  state.verifyResult = { error: null };
+  assert.equal(await redirectedTo("?token_hash=th&type=signup&next=/"), "/");
+  assert.equal(
+    await redirectedTo("?token_hash=th&type=recovery&next=/update-password"),
+    "/update-password",
+  );
+  // 許可リストに無いサイト内のページも使わない(完全一致のみ許可)
+  assert.equal(await redirectedTo("?token_hash=th&type=signup&next=/settings"), "/update-password");
+  assert.equal(await redirectedTo("?token_hash=th&type=signup&next=/%20"), "/update-password");
+});
+
 test("codeもtoken_hashも無い場合は期限切れの画面へ", async () => {
   assert.equal(await redirectedTo(""), "/reset-password?error=expired");
   assert.equal(await redirectedTo("?error=access_denied&error_code=otp_expired"), "/reset-password?error=expired");
