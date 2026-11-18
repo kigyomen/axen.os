@@ -10,6 +10,7 @@ import {
   sanitizeCoachActions,
   sanitizeFollowUpQuestions,
 } from "./actions-schema";
+import { buildCoachDiagnostics } from "./diagnostics";
 
 export interface CoachConversationMessage {
   role: "user" | "assistant";
@@ -53,6 +54,14 @@ export async function* streamCoachReply(params: {
   }
 
   const finalMessage = await claudeStream.finalMessage();
+  // 【一時的な調査用】質問候補が表示されない原因の調査。応答の形(終了理由・ツール呼び出しの
+  // 有無・質問候補の形式と件数・トークン数)だけを記録し、本文や個人情報は含めない。
+  // 調査用の記録で失敗しても、AIの回答には影響させない。原因特定後に削除する。
+  try {
+    console.info(`coach diagnostics ${JSON.stringify(buildCoachDiagnostics(finalMessage))}`);
+  } catch {
+    // 記録できなくても何もしない
+  }
   const toolUseBlock = finalMessage.content.find(
     (block) => block.type === "tool_use" && block.name === "propose_actions",
   );
