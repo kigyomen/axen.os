@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AndroidBackButtonHandler } from "@/components/capacitor/AndroidBackButtonHandler";
+import { ZoomGuard } from "@/components/layout/ZoomGuard";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { ThemeScript } from "@/components/theme/ThemeScript";
 import { THEME_COLOR_DARK, THEME_COLOR_LIGHT } from "@/lib/theme";
@@ -24,6 +25,10 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  // スマートフォンでの意図しない拡大・縮小を防ぐ(iOSアプリ・Androidで有効。
+  // iPhoneのSafariはこの設定を無視するため、ZoomGuardでピンチ操作を取り消す)。
+  maximumScale: 1,
+  userScalable: false,
   // iOSアプリ(Capacitor)のWebViewは画面全体(ステータスバー・ノッチの裏)まで
   // 広がっており、coverを指定しないとenv(safe-area-inset-*)が常に0になる。
   // 余白はglobals.cssのbody等でenv()を使って確保する(PC等ではenv()=0で変化なし)。
@@ -51,6 +56,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <ThemeProvider>
           <AndroidBackButtonHandler />
+          <ZoomGuard />
           {children}
         </ThemeProvider>
       </body>

@@ -8,6 +8,7 @@ import {
   PROPOSE_ACTIONS_TOOL,
   hasAnyCoachActions,
   sanitizeCoachActions,
+  sanitizeFollowUpQuestions,
 } from "./actions-schema";
 
 export interface CoachConversationMessage {
@@ -57,10 +58,13 @@ export async function* streamCoachReply(params: {
   );
   if (toolUseBlock && toolUseBlock.type === "tool_use") {
     const actions = sanitizeCoachActions(toolUseBlock.input);
-    if (hasAnyCoachActions(actions)) {
+    // 「次の質問」候補も同じツール呼び出しで受け取る(追加のAPI呼び出しは行わない)。
+    const input = toolUseBlock.input as { follow_up_questions?: unknown } | null;
+    const followUpQuestions = sanitizeFollowUpQuestions(input?.follow_up_questions);
+    if (hasAnyCoachActions(actions) || followUpQuestions.length > 0) {
       // 会話テキストの後ろに、既存のプレーンテキストストリームの延長として
       // マーカー+JSONを1チャンクだけ追加する(新しいレスポンス形式は導入しない)。
-      yield `${COACH_ACTIONS_MARKER}${JSON.stringify(actions)}`;
+      yield `${COACH_ACTIONS_MARKER}${JSON.stringify({ ...actions, followUpQuestions })}`;
     }
   }
 }

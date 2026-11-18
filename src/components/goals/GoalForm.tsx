@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState, type FormEvent } from "react";
+import { useActionState, useState, type FormEvent } from "react";
 import { createGoal, updateGoal, type GoalActionState } from "@/lib/supabase/goal-actions";
 import { MANUAL_GOAL_STATUS_OPTIONS, goalStatusLabel, goalTypeLabel } from "@/lib/goal-status";
 import { formatJapaneseNumber, parseJapaneseNumber } from "@/lib/japanese-number";
@@ -37,7 +37,19 @@ export function GoalForm({
   initialValues?: GoalFormInitialValues;
 }) {
   const action = goal ? updateGoal : createGoal;
-  const [state, formAction, isPending] = useActionState(action, initialState);
+  // 保存に成功したら、その場でonDone()を呼ぶ(呼び出し元がモーダルを閉じ、完了通知を出す)。
+  // 画面の再描画を待ってからuseEffectで呼ぶ方式だと、一覧が空の状態から最初の1件を
+  // 追加したときなどにフォームが作り直され、onDone()が呼ばれずモーダルが残ってしまうため。
+  const [state, formAction, isPending] = useActionState(
+    async (prevState: typeof initialState, formData: FormData) => {
+      const result = await action(prevState, formData);
+      if (result.success) {
+        onDone();
+      }
+      return result;
+    },
+    initialState,
+  );
   // 現在値が目標値以上の場合は自動的に「達成」表示になり、ステータスを
   // 手動選択できない(達成条件を下回れば、保存されている値へ自動的に戻る)。
   const isAchieved = goal ? goal.current_value >= goal.target_value : false;
@@ -58,12 +70,6 @@ export function GoalForm({
 
   const targetParsed = parseJapaneseNumber(targetText);
   const currentParsed = currentText.trim() === "" ? 0 : parseJapaneseNumber(currentText);
-
-  useEffect(() => {
-    if (state.success) {
-      onDone();
-    }
-  }, [state.success, onDone]);
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     if (targetText.trim() === "" || targetParsed === null || targetParsed <= 0) {

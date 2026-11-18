@@ -1,10 +1,11 @@
 "use client";
 
 import { ListChecks, Pencil, Plus, Trash2 } from "lucide-react";
-import { useOptimistic, useState, useTransition } from "react";
+import { useCallback, useOptimistic, useState, useTransition } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
+import { Toast } from "@/components/ui/Toast";
 import { priorityLabel, priorityOrder } from "@/lib/task-priority";
 import { calcDueUrgency, dueUrgencyLabel, dueUrgencyTone } from "@/lib/task-due";
 import { toggleTaskDone } from "@/lib/supabase/task-actions";
@@ -37,6 +38,16 @@ function compareOpenTasks(a: Task, b: Task): number {
 
 export function TasksClient({ tasks }: { tasks: Task[] }) {
   const [modal, setModal] = useState<ModalState>(null);
+  // 追加が完了したときの通知。keyを変えて、続けて追加したときも表示時間をやり直す。
+  const [toast, setToast] = useState<{ key: number; message: string } | null>(null);
+  const dismissToast = useCallback(() => setToast(null), []);
+  const handleCreated = useCallback(() => {
+    setModal(null);
+    setToast({ key: Date.now(), message: "タスクを追加しました！" });
+  }, []);
+  const toastElement = toast ? (
+    <Toast key={toast.key} message={toast.message} onDismiss={dismissToast} />
+  ) : null;
   // チェックを押した瞬間にUIへ反映するための楽観的更新。サーバーへの保存が
   // 完了(revalidatePath)する前に完了状態を切り替える。保存が失敗した場合は
   // tasksプロパティ(サーバーの実データ)が変わらないため、Transition終了時に
@@ -85,9 +96,10 @@ export function TasksClient({ tasks }: { tasks: Task[] }) {
 
         {modal?.type === "create" ? (
           <Modal title="タスクを追加" onClose={() => setModal(null)}>
-            <TaskForm onDone={() => setModal(null)} />
+            <TaskForm onDone={handleCreated} />
           </Modal>
         ) : null}
+        {toastElement}
       </>
     );
   }
@@ -173,7 +185,7 @@ export function TasksClient({ tasks }: { tasks: Task[] }) {
 
       {modal?.type === "create" ? (
         <Modal title="タスクを追加" onClose={() => setModal(null)}>
-          <TaskForm onDone={() => setModal(null)} />
+          <TaskForm onDone={handleCreated} />
         </Modal>
       ) : null}
 
@@ -186,6 +198,7 @@ export function TasksClient({ tasks }: { tasks: Task[] }) {
       {modal?.type === "delete" ? (
         <DeleteTaskModal task={modal.task} onClose={() => setModal(null)} />
       ) : null}
+      {toastElement}
     </div>
   );
 }

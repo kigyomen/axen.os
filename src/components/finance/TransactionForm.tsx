@@ -1,7 +1,7 @@
 "use client";
 
 import { Calculator } from "lucide-react";
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 import {
   createTransaction,
   updateTransaction,
@@ -34,13 +34,19 @@ export function TransactionForm({
 }) {
   const [kind, setKind] = useState<TransactionKind>(entry?.kind ?? "sale");
   const action = entry ? updateTransaction : createTransaction;
-  const [state, formAction, isPending] = useActionState(action, initialState);
-
-  useEffect(() => {
-    if (state.success) {
-      onDone();
-    }
-  }, [state.success, onDone]);
+  // 保存に成功したら、その場でonDone()を呼ぶ(呼び出し元がモーダルを閉じ、完了通知を出す)。
+  // 画面の再描画を待ってからuseEffectで呼ぶ方式だと、一覧が空の状態から最初の1件を
+  // 追加したときなどにフォームが作り直され、onDone()が呼ばれずモーダルが残ってしまうため。
+  const [state, formAction, isPending] = useActionState(
+    async (prevState: typeof initialState, formData: FormData) => {
+      const result = await action(prevState, formData);
+      if (result.success) {
+        onDone();
+      }
+      return result;
+    },
+    initialState,
+  );
 
   const isSale = kind === "sale";
   const partyLabel = isSale ? "顧客名" : "支払先";

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDown, Send } from "lucide-react";
 import { suggestedPrompts } from "@/lib/mock-data";
@@ -11,6 +11,7 @@ import {
   computeStreamingDisplayText,
   EMPTY_COACH_ACTIONS,
   sanitizeCoachActions,
+  sanitizeFollowUpQuestions,
   splitCoachStreamText,
   type CoachActions,
 } from "@/lib/coach/actions-schema";
@@ -53,6 +54,9 @@ export function CoachChat({ initialMessages, initialInput, coachCharacterId }: C
   const [input, setInput] = useState(initialInput ?? "");
   const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // 直前のAIの回答と一緒に届いた「次の質問」候補。無い場合(会話履歴が無い・
+  // ページを開き直した・生成や解析に失敗した等)は固定の質問例を表示する。
+  const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
   const scrollAnchorRef = useRef<HTMLDivElement>(null);
   // チャット全体はこのページ自身(window)がスクロールする設計で、専用の
   // overflow-y-autoコンテナは持たない(既存のsticky入力欄と同じ前提)。
@@ -99,7 +103,10 @@ export function CoachChat({ initialMessages, initialInput, coachCharacterId }: C
 
     setErrorMessage(null);
     setIsSending(true);
-    setInput("");
+    // 入力欄の文章を送ったときだけ入力欄を空にする(質問候補をタップして
+    // 送ったときは、書きかけの文章を消さない)。
+    setInput((current) => (current.trim() === trimmed ? "" : current));
+    setFollowUpQuestions([]);
 
     const userMessage: ChatMessage = {
       id: `local-user-${Date.now()}`,
@@ -164,13 +171,19 @@ export function CoachChat({ initialMessages, initialInput, coachCharacterId }: C
 
       const { displayText, actionsJson } = splitCoachStreamText(raw);
       let actions: CoachActions = EMPTY_COACH_ACTIONS;
+      let nextQuestions: string[] = [];
       if (actionsJson) {
         try {
-          actions = sanitizeCoachActions(JSON.parse(actionsJson));
+          const parsed: unknown = JSON.parse(actionsJson);
+          actions = sanitizeCoachActions(parsed);
+          nextQuestions = sanitizeFollowUpQuestions(
+            (parsed as { followUpQuestions?: unknown } | null)?.followUpQuestions,
+          );
         } catch {
-          // 解析できない場合はボタンを出さないだけで、通常の会話表示は維持する
+          // 解析できない場合はボタン・質問候補を出さないだけで、通常の会話表示は維持する
         }
       }
+      setFollowUpQuestions(nextQuestions);
       setMessages((prev) =>
         prev.map((m) => (m.id === coachMessageId ? { ...m, content: displayText, actions } : m)),
       );
@@ -180,6 +193,11 @@ export function CoachChat({ initialMessages, initialInput, coachCharacterId }: C
     } finally {
       setIsSending(false);
     }
+  }
+
+  // 質問候補をタップしたら、その質問をそのままAIコーチへ送信する。
+  function handleSuggestionClick(e: MouseEvent<HTMLButtonElement>) {
+    void sendMessage(e.currentTarget.value);
   }
 
   function handleSubmit(e: FormEvent) {
@@ -250,12 +268,13 @@ export function CoachChat({ initialMessages, initialInput, coachCharacterId }: C
       ) : null}
 
       <div className="flex flex-wrap gap-2">
-        {suggestedPrompts.map((prompt) => (
+        {(followUpQuestions.length > 0 ? followUpQuestions : suggestedPrompts).map((prompt) => (
           <button
             key={prompt}
             type="button"
             disabled={isSending}
-            onClick={() => setInput(prompt)}
+            value={prompt}
+            onClick={handleSuggestionClick}
             className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
           >
             {prompt}

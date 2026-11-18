@@ -177,6 +177,9 @@ body::before {
  */
 html {
   -webkit-tap-highlight-color: transparent;
+  /* ダブルタップによる拡大を防ぐ(スクロール・タップ・入力の操作はそのまま)。
+     ピンチ操作による拡大は、layout.tsxのviewport設定とZoomGuardで防いでいる。 */
+  touch-action: manipulation;
 }
 
 button,
