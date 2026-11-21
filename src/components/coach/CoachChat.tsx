@@ -31,6 +31,20 @@ interface CoachChatProps {
    * 解決する)。
    */
   coachCharacterId: CoachCharacterId;
+  /**
+   * 【一時的な調査用】trueの場合だけ、直前の回答で受け取った質問候補データの状況
+   * (区切りの検出・データ長・解析成否・候補数)を表示する。本文・質問の文面は表示しない。
+   * coach/page.tsxがURLの?coachDebug=1を見て渡す。原因特定後に削除する。
+   */
+  debug?: boolean;
+}
+
+/** 【一時的な調査用】直前の回答で受け取った質問候補データの状況。 */
+interface CoachDebugInfo {
+  markerFound: boolean;
+  dataLength: number;
+  parseOk: boolean;
+  followUpCount: number;
 }
 
 interface ChatMessage {
@@ -45,7 +59,12 @@ function toChatMessage(message: CoachMessage): ChatMessage {
   return { id: message.id, role: message.role, content: message.content };
 }
 
-export function CoachChat({ initialMessages, initialInput, coachCharacterId }: CoachChatProps) {
+export function CoachChat({
+  initialMessages,
+  initialInput,
+  coachCharacterId,
+  debug = false,
+}: CoachChatProps) {
   const character = resolveCoachCharacter(coachCharacterId);
   const router = useRouter();
   const [messages, setMessages] = useState<ChatMessage[]>(
@@ -57,6 +76,8 @@ export function CoachChat({ initialMessages, initialInput, coachCharacterId }: C
   // 直前のAIの回答と一緒に届いた「次の質問」候補。無い場合(会話履歴が無い・
   // ページを開き直した・生成や解析に失敗した等)は固定の質問例を表示する。
   const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
+  // 【一時的な調査用】debugがtrueのときだけ使う。原因特定後に削除する。
+  const [debugInfo, setDebugInfo] = useState<CoachDebugInfo | null>(null);
   const scrollAnchorRef = useRef<HTMLDivElement>(null);
   // チャット全体はこのページ自身(window)がスクロールする設計で、専用の
   // overflow-y-autoコンテナは持たない(既存のsticky入力欄と同じ前提)。
@@ -172,9 +193,11 @@ export function CoachChat({ initialMessages, initialInput, coachCharacterId }: C
       const { displayText, actionsJson } = splitCoachStreamText(raw);
       let actions: CoachActions = EMPTY_COACH_ACTIONS;
       let nextQuestions: string[] = [];
+      let parseOk = false; // 【一時的な調査用】解析の成否を記録するだけ(処理には使わない)
       if (actionsJson) {
         try {
           const parsed: unknown = JSON.parse(actionsJson);
+          parseOk = true;
           actions = sanitizeCoachActions(parsed);
           nextQuestions = sanitizeFollowUpQuestions(
             (parsed as { followUpQuestions?: unknown } | null)?.followUpQuestions,
@@ -184,6 +207,14 @@ export function CoachChat({ initialMessages, initialInput, coachCharacterId }: C
         }
       }
       setFollowUpQuestions(nextQuestions);
+      if (debug) {
+        setDebugInfo({
+          markerFound: actionsJson !== null,
+          dataLength: actionsJson?.length ?? 0,
+          parseOk,
+          followUpCount: nextQuestions.length,
+        });
+      }
       setMessages((prev) =>
         prev.map((m) => (m.id === coachMessageId ? { ...m, content: displayText, actions } : m)),
       );
@@ -281,6 +312,26 @@ export function CoachChat({ initialMessages, initialInput, coachCharacterId }: C
           </button>
         ))}
       </div>
+
+      {debug ? (
+        // 【一時的な調査用】?coachDebug=1のときだけ表示。本文・質問の文面・個人情報は出さない。
+        <div
+          data-testid="coach-debug"
+          className="rounded-xl border border-border bg-surface-muted p-3 font-mono text-xs text-foreground"
+        >
+          <p className="mb-1 font-semibold">AIコーチ 診断(一時的な表示)</p>
+          {debugInfo ? (
+            <>
+              <p>区切り文字の検出: {debugInfo.markerFound ? "YES" : "NO"}</p>
+              <p>区切り文字以降のデータ長: {debugInfo.dataLength}</p>
+              <p>JSONの解析: {debugInfo.parseOk ? "YES" : "NO"}</p>
+              <p>質問候補の取得数: {debugInfo.followUpCount}</p>
+            </>
+          ) : (
+            <p>まだ回答を受信していません(メッセージを送ると表示されます)</p>
+          )}
+        </div>
+      ) : null}
 
       {!isAtBottom ? (
         <div className="sticky bottom-[calc(9rem+env(safe-area-inset-bottom))] z-10 flex justify-end md:bottom-[calc(5rem+env(safe-area-inset-bottom))]">

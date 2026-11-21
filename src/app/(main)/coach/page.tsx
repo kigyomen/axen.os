@@ -9,7 +9,7 @@ import { getCurrentProfile } from "@/lib/supabase/profile";
 export default async function CoachPage({
   searchParams,
 }: {
-  searchParams: Promise<{ prompt?: string }>;
+  searchParams: Promise<{ prompt?: string; coachDebug?: string }>;
 }) {
   const business = await getCurrentBusiness();
   // getCurrentProfile()はReact cache()で1リクエスト内メモ化されるため、
@@ -18,7 +18,7 @@ export default async function CoachPage({
     business ? getCoachMessages(business.id) : Promise.resolve([]),
     getCurrentProfile(),
   ]);
-  const { prompt } = await searchParams;
+  const { prompt, coachDebug } = await searchParams;
   const coachCharacterId = resolveCoachCharacter(profile?.coach_character).id;
 
   if (!business) {
@@ -49,6 +49,8 @@ export default async function CoachPage({
       initialMessages={initialMessages}
       initialInput={prompt}
       coachCharacterId={coachCharacterId}
+      // 【一時的な調査用】URLに?coachDebug=1がある場合だけ、質問候補の受信状況を表示する。
+      debug={coachDebug === "1"}
     />
   );
 }
