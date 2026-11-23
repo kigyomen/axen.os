@@ -1,4 +1,5 @@
 import "server-only";
+import type Anthropic from "@anthropic-ai/sdk";
 import { getAnthropicClient, COACH_MODEL } from "../anthropic/client";
 import type { CoachContext } from "../supabase/coach-context";
 import { isCoachMockModeEnabled } from "./mock-mode";
@@ -15,6 +16,33 @@ import { buildCoachDiagnostics } from "./diagnostics";
 export interface CoachConversationMessage {
   role: "user" | "assistant";
   content: string;
+}
+
+/**
+ * 今回のユーザーメッセージの末尾に付ける、propose_actionsツール呼び出しの再確認。
+ * 会話履歴には過去の回答の本文だけが入り、ツール呼び出しの記録は入らないため、
+ * Claudeが「過去の回答ではツールを呼んでいない」と受け取り、呼び出しを省くことがある。
+ * それを防ぐため、Claudeへ送る今回の依頼にだけ付ける(DBへは保存しない。API通信回数も増えない)。
+ * system promptで、このタグはシステムからの補足でありユーザーの発言ではないと説明している。
+ */
+const FOLLOW_UP_REMINDER =
+  "<reply_reminder>回答の本文を書き終えたら、最後に必ず propose_actions ツールを1回呼び出し、" +
+  "follow_up_questions に今回の回答に沿った次の質問候補を3つ入れてください。</reply_reminder>";
+
+/** 最後のユーザーメッセージにだけ、FOLLOW_UP_REMINDERを別のテキストとして付け足す。 */
+function withFollowUpReminder(messages: CoachConversationMessage[]): Anthropic.MessageParam[] {
+  const lastIndex = messages.length - 1;
+  return messages.map((message, index) =>
+    index === lastIndex && message.role === "user"
+      ? {
+          role: "user",
+          content: [
+            { type: "text", text: message.content },
+            { type: "text", text: FOLLOW_UP_REMINDER },
+          ],
+        }
+      : message,
+  );
 }
 
 /**
@@ -43,7 +71,7 @@ export async function* streamCoachReply(params: {
     // 会話テキストのみだった頃より少し余裕を持たせる。
     max_tokens: 3072,
     system: params.systemPrompt,
-    messages: params.messages,
+    messages: withFollowUpReminder(params.messages),
     tools: [PROPOSE_ACTIONS_TOOL],
   });
 
