@@ -249,15 +249,21 @@ export function computeStreamingDisplayText(rawText: string): string {
   return pendingLength === 0 ? rawText : rawText.slice(0, rawText.length - pendingLength);
 }
 
-/** Claudeに渡すツール定義。会話の返答そのものではなく、提案候補の構造化だけに使う。 */
+/**
+ * Claudeに渡すツール定義。会話の返答そのものではなく、回答の後に画面へ出す
+ * 「次の質問候補」(毎回必須)と、提案候補(タスク・目標・アイデア)の構造化に使う。
+ */
 export const PROPOSE_ACTIONS_TOOL: Anthropic.Tool = {
   name: "propose_actions",
   description:
-    "ユーザーへの返答の文章を書き終えた後、毎回の返答の最後に1回だけ呼び出す。" +
+    "ユーザーへの返答の文章を書き終えた後、毎回の返答の最後に必ず1回だけ呼び出す。" +
+    "主な役割は、回答の後に画面へ表示する次の質問候補(follow_up_questions、毎回必須)を渡すこと。" +
+    "タスク・目標・アイデアの提案が無い回答でも、質問候補を渡すために必ず呼び出す。" +
     "通常の会話の返答はこのツールとは別に、必ず自然な文章で行う(このツールは返答の代わりにはならない)。" +
     "tasks/goals/ideasには、返答の中でタスク・目標・事業アイデアとして追加できる具体的な提案をした場合だけ" +
     "候補を入れ、はっきりした提案がない場合は空配列にする。" +
-    "follow_up_questionsには、直前のやり取りを踏まえてユーザーが次に聞きたくなりそうな質問を3つ入れる。" +
+    "follow_up_questionsには、今回の回答と会話の内容を踏まえて、ユーザーが次に相談したくなりそうな" +
+    "具体的で自然な質問を必ず3つ入れる。" +
     "期限(due_date/target_date)は、ユーザーまたはあなた自身が「今週中」「明日まで」のように文章中で明確な期限に" +
     "言及した場合のみYYYY-MM-DD形式で設定し、年月日が具体的に定まらない曖昧な表現の場合は絶対に推測で日付を" +
     "作らず省略すること。",
@@ -313,11 +319,15 @@ export const PROPOSE_ACTIONS_TOOL: Anthropic.Tool = {
       follow_up_questions: {
         type: "array",
         description:
-          "ユーザーが次にそのまま送信できる質問の候補を3つ。直前のやり取りの内容に沿った具体的なものにし、" +
-          "ユーザー自身の言葉(「〜を教えて」「〜はどうすればいい?」等)で、それぞれ40文字以内の1文にする。",
+          "必須。ユーザーが次にそのまま送信できる質問の候補をちょうど3つ。今回の回答と会話の内容に沿った" +
+          "具体的で自然なものにし、ユーザー自身の言葉(「〜を教えて」「〜はどうすればいい?」等)で、" +
+          "それぞれ40文字以内の1文にする。",
         items: { type: "string" },
+        minItems: 3,
+        maxItems: 3,
       },
     },
+    required: ["follow_up_questions"],
   },
 };
 
