@@ -250,20 +250,20 @@ export function computeStreamingDisplayText(rawText: string): string {
 }
 
 /**
- * Claudeに渡すツール定義。会話の返答そのものではなく、回答の後に画面へ出す
- * 「次の質問候補」(毎回必須)と、提案候補(タスク・目標・アイデア)の構造化に使う。
+ * Claudeに渡すツール定義。会話の返答そのものではなく、回答の中で実際に示した提案を、
+ * 画面のボタン(提案ボタン・タスク/目標/アイデアの追加ボタン)用に構造化するために使う。
  */
 export const PROPOSE_ACTIONS_TOOL: Anthropic.Tool = {
   name: "propose_actions",
   description:
-    "ユーザーへの返答の文章を書き終えた後、毎回の返答の最後に必ず1回だけ呼び出す。" +
-    "主な役割は、回答の後に画面へ表示する次の質問候補(follow_up_questions、毎回必須)を渡すこと。" +
-    "タスク・目標・アイデアの提案が無い回答でも、質問候補を渡すために必ず呼び出す。" +
+    "ユーザーへの返答の文章を書き終えた後、毎回の返答の最後に必ず1回だけ呼び出す(提案が無い回答でも、" +
+    "空配列を渡すために呼び出す)。" +
+    "next_step_suggestionsには、今回の返答の本文の中で実際にユーザーへ示した提案(次の行動・学習・調査・実行・" +
+    "深掘り等)だけを、示した数だけ入れる。本文に無い提案を新しく作ったり、数を合わせるために追加したりしない。" +
+    "提案をしていない返答では空配列にする。" +
     "通常の会話の返答はこのツールとは別に、必ず自然な文章で行う(このツールは返答の代わりにはならない)。" +
     "tasks/goals/ideasには、返答の中でタスク・目標・事業アイデアとして追加できる具体的な提案をした場合だけ" +
     "候補を入れ、はっきりした提案がない場合は空配列にする。" +
-    "follow_up_questionsには、今回の回答と会話の内容を踏まえて、ユーザーが次に相談したくなりそうな" +
-    "具体的で自然な質問を必ず3つ入れる。" +
     "期限(due_date/target_date)は、ユーザーまたはあなた自身が「今週中」「明日まで」のように文章中で明確な期限に" +
     "言及した場合のみYYYY-MM-DD形式で設定し、年月日が具体的に定まらない曖昧な表現の場合は絶対に推測で日付を" +
     "作らず省略すること。",
@@ -316,51 +316,76 @@ export const PROPOSE_ACTIONS_TOOL: Anthropic.Tool = {
           required: ["title"],
         },
       },
-      follow_up_questions: {
+      next_step_suggestions: {
         type: "array",
         description:
-          "必須。ユーザーが次にそのまま送信できる質問の候補をちょうど3つ。今回の回答と会話の内容に沿った" +
-          "具体的で自然なものにし、ユーザー自身の言葉(「〜を教えて」「〜はどうすればいい?」等)で、" +
-          "それぞれ40文字以内の1文にする。",
-        items: { type: "string" },
-        minItems: 3,
-        maxItems: 3,
+          "必須(提案が無ければ空配列)。今回の返答の本文で実際に示した提案だけを、示した数だけ入れる。" +
+          "件数は固定しない。本文に無い提案は入れない。",
+        items: {
+          type: "object",
+          properties: {
+            label: {
+              type: "string",
+              description:
+                "ボタンに表示する短い文(30文字程度まで)。本文の提案を短くしてよいが、意味は変えない。",
+            },
+            message: {
+              type: "string",
+              description:
+                "ボタンを押したときにユーザーの発言としてAIへ送る文。その提案を実行・深掘りするための依頼を、" +
+                "ユーザー自身の言葉で1文で書く(例:「競合3社の価格を一緒に調べたい」)。",
+            },
+          },
+          required: ["label", "message"],
+        },
       },
     },
-    required: ["follow_up_questions"],
+    required: ["next_step_suggestions"],
   },
 };
 
-/** 会話の流れに応じた「次の質問」候補の最大件数・最大文字数。 */
-export const MAX_FOLLOW_UP_QUESTIONS = 3;
-const MAX_FOLLOW_UP_QUESTION_LENGTH = 60;
+/**
+ * AIが今回の回答の中で実際に示した提案(次の行動・学習・調査・実行・深掘り等)を、
+ * ワンタップで実行できるボタンにするためのデータ。
+ * - label: ボタンに表示する短い文(元の提案と意味を変えない)
+ * - message: ボタンを押したときに、ユーザーの発言としてAIへ送信する文
+ * 件数は固定しない(提案が無ければ0件)。MAX_NEXT_STEP_SUGGESTIONSは異常な出力に備えた上限。
+ */
+export interface CoachNextStepSuggestion {
+  label: string;
+  message: string;
+}
+
+export const MAX_NEXT_STEP_SUGGESTIONS = 5;
+const MAX_NEXT_STEP_LABEL_LENGTH = 40;
+const MAX_NEXT_STEP_MESSAGE_LENGTH = 200;
+
+function normalizeSuggestionText(value: unknown, maxLength: number): string | null {
+  if (typeof value !== "string") return null;
+  const text = value.replace(/\s+/g, " ").trim();
+  if (!text || text.length > maxLength) return null;
+  return text;
+}
 
 /**
- * Claudeが返した「次の質問」候補(propose_actionsツールのfollow_up_questions)を検証する。
- * 文字列以外・空・長すぎるもの・重複は捨て、最大3件までにする。
- * 形式が想定外の場合は空配列を返し、画面側は固定の質問例にフォールバックする。
+ * Claudeが返した提案ボタンのデータ(propose_actionsツールのnext_step_suggestions)を検証する。
+ * labelかmessageが文字列でない・空・長すぎるもの、labelが重複するものは捨てる。
+ * 件数は増やさない(足りない分を補わない)。形式が想定外の場合は空配列を返し、
+ * 画面側はボタンを表示しない。
  */
-export function sanitizeFollowUpQuestions(raw: unknown): string[] {
+export function sanitizeNextStepSuggestions(raw: unknown): CoachNextStepSuggestion[] {
   if (!Array.isArray(raw)) {
     return [];
   }
-  const questions: string[] = [];
+  const suggestions: CoachNextStepSuggestion[] = [];
   for (const item of raw) {
-    if (typeof item !== "string") {
-      continue;
-    }
-    const question = item.replace(/\s+/g, " ").trim();
-    if (
-      question.length === 0 ||
-      question.length > MAX_FOLLOW_UP_QUESTION_LENGTH ||
-      questions.includes(question)
-    ) {
-      continue;
-    }
-    questions.push(question);
-    if (questions.length >= MAX_FOLLOW_UP_QUESTIONS) {
-      break;
-    }
+    const record = asRecord(item);
+    if (!record) continue;
+    const label = normalizeSuggestionText(record.label, MAX_NEXT_STEP_LABEL_LENGTH);
+    const message = normalizeSuggestionText(record.message, MAX_NEXT_STEP_MESSAGE_LENGTH);
+    if (!label || !message || suggestions.some((s) => s.label === label)) continue;
+    suggestions.push({ label, message });
+    if (suggestions.length >= MAX_NEXT_STEP_SUGGESTIONS) break;
   }
-  return questions;
+  return suggestions;
 }

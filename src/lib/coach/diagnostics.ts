@@ -1,8 +1,8 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { sanitizeFollowUpQuestions } from "./actions-schema";
+import { sanitizeNextStepSuggestions } from "./actions-schema";
 
 /**
- * 【一時的な調査用】AIコーチの「次の質問」候補が本番で表示されない原因を調べるため、
+ * 【一時的な調査用】AIコーチの提案ボタン(旧「次の質問」候補)が本番で表示されない原因を調べるため、
  * Claudeの応答の「形」だけをVercelのログに1行で残す。原因が分かったら、このファイルと
  * provider.tsの呼び出し部分を削除する。
  *
@@ -16,12 +16,12 @@ export interface CoachDiagnostics {
   blockTypes: string[];
   /** propose_actionsツールが呼び出されたか */
   toolCalled: boolean;
-  /** follow_up_questionsのデータ形式(array / string / object / missing 等) */
-  followUpType: string;
-  /** follow_up_questionsが配列だった場合の要素数(配列でなければnull) */
-  followUpRawCount: number | null;
-  /** 検証を通って画面に送られる質問候補の件数 */
-  followUpAcceptedCount: number;
+  /** next_step_suggestionsのデータ形式(array / string / object / missing 等) */
+  nextStepType: string;
+  /** next_step_suggestionsが配列だった場合の要素数(配列でなければnull) */
+  nextStepRawCount: number | null;
+  /** 検証を通って画面に送られる提案ボタンの件数 */
+  nextStepAcceptedCount: number;
   inputTokens: number;
   outputTokens: number;
 }
@@ -41,15 +41,15 @@ export function buildCoachDiagnostics(message: Anthropic.Message): CoachDiagnost
     toolUseBlock && toolUseBlock.type === "tool_use" && toolUseBlock.input && typeof toolUseBlock.input === "object"
       ? (toolUseBlock.input as Record<string, unknown>)
       : null;
-  const followUp = input ? input.follow_up_questions : undefined;
+  const nextSteps = input ? input.next_step_suggestions : undefined;
 
   return {
     stopReason: message.stop_reason,
     blockTypes: message.content.map((block) => block.type),
     toolCalled: Boolean(toolUseBlock),
-    followUpType: describeType(followUp),
-    followUpRawCount: Array.isArray(followUp) ? followUp.length : null,
-    followUpAcceptedCount: sanitizeFollowUpQuestions(followUp).length,
+    nextStepType: describeType(nextSteps),
+    nextStepRawCount: Array.isArray(nextSteps) ? nextSteps.length : null,
+    nextStepAcceptedCount: sanitizeNextStepSuggestions(nextSteps).length,
     inputTokens: message.usage.input_tokens,
     outputTokens: message.usage.output_tokens,
   };

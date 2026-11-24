@@ -9,7 +9,7 @@ import {
   PROPOSE_ACTIONS_TOOL,
   hasAnyCoachActions,
   sanitizeCoachActions,
-  sanitizeFollowUpQuestions,
+  sanitizeNextStepSuggestions,
 } from "./actions-schema";
 import { buildCoachDiagnostics } from "./diagnostics";
 
@@ -26,8 +26,9 @@ export interface CoachConversationMessage {
  * system promptで、このタグはシステムからの補足でありユーザーの発言ではないと説明している。
  */
 const FOLLOW_UP_REMINDER =
-  "<reply_reminder>回答の本文を書き終えたら、最後に必ず propose_actions ツールを1回呼び出し、" +
-  "follow_up_questions に今回の回答に沿った次の質問候補を3つ入れてください。</reply_reminder>";
+  "<reply_reminder>回答の本文を書き終えたら、最後に必ず propose_actions ツールを1回呼び出してください。" +
+  "next_step_suggestions には、今回の回答の本文で実際に示した提案だけを示した数だけ入れ、" +
+  "提案が無ければ空配列にしてください。</reply_reminder>";
 
 /** 最後のユーザーメッセージにだけ、FOLLOW_UP_REMINDERを別のテキストとして付け足す。 */
 function withFollowUpReminder(messages: CoachConversationMessage[]): Anthropic.MessageParam[] {
@@ -95,13 +96,13 @@ export async function* streamCoachReply(params: {
   );
   if (toolUseBlock && toolUseBlock.type === "tool_use") {
     const actions = sanitizeCoachActions(toolUseBlock.input);
-    // 「次の質問」候補も同じツール呼び出しで受け取る(追加のAPI呼び出しは行わない)。
-    const input = toolUseBlock.input as { follow_up_questions?: unknown } | null;
-    const followUpQuestions = sanitizeFollowUpQuestions(input?.follow_up_questions);
-    if (hasAnyCoachActions(actions) || followUpQuestions.length > 0) {
+    // 回答の中で示した提案のボタン用データも、同じツール呼び出しで受け取る(追加のAPI呼び出しは行わない)。
+    const input = toolUseBlock.input as { next_step_suggestions?: unknown } | null;
+    const nextSteps = sanitizeNextStepSuggestions(input?.next_step_suggestions);
+    if (hasAnyCoachActions(actions) || nextSteps.length > 0) {
       // 会話テキストの後ろに、既存のプレーンテキストストリームの延長として
       // マーカー+JSONを1チャンクだけ追加する(新しいレスポンス形式は導入しない)。
-      yield `${COACH_ACTIONS_MARKER}${JSON.stringify({ ...actions, followUpQuestions })}`;
+      yield `${COACH_ACTIONS_MARKER}${JSON.stringify({ ...actions, nextSteps })}`;
     }
   }
 }

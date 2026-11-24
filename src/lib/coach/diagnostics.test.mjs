@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildCoachDiagnostics } from "./diagnostics.ts";
 
-const SECRET_TEXTS = ["ひみつの本文です", "価格の決め方を教えて", "タスクひみつ", "user@example.com"];
+const SECRET_TEXTS = ["ひみつの本文です", "価格の決め方を教えて", "価格を決める", "タスクひみつ", "user@example.com"];
 
 function message(content, stopReason = "tool_use") {
   return {
@@ -29,7 +29,10 @@ test("ツール呼び出しあり・質問候補が配列の場合", () => {
         type: "tool_use",
         id: "t",
         name: "propose_actions",
-        input: { tasks: [{ title: "タスクひみつ" }], follow_up_questions: ["価格の決め方を教えて", "", 5] },
+        input: {
+          tasks: [{ title: "タスクひみつ" }],
+          next_step_suggestions: [{ label: "価格を決める", message: "価格の決め方を教えて" }, { label: "" }, 5],
+        },
       },
     ]),
   );
@@ -37,9 +40,9 @@ test("ツール呼び出しあり・質問候補が配列の場合", () => {
     stopReason: "tool_use",
     blockTypes: ["thinking", "text", "tool_use"],
     toolCalled: true,
-    followUpType: "array",
-    followUpRawCount: 3,
-    followUpAcceptedCount: 1,
+    nextStepType: "array",
+    nextStepRawCount: 3,
+    nextStepAcceptedCount: 1,
     inputTokens: 1200,
     outputTokens: 345,
   });
@@ -55,25 +58,25 @@ test("ツール呼び出しなし・上限で打ち切りの場合", () => {
   );
   assert.equal(d.stopReason, "max_tokens");
   assert.equal(d.toolCalled, false);
-  assert.equal(d.followUpType, "missing");
-  assert.equal(d.followUpRawCount, null);
-  assert.equal(d.followUpAcceptedCount, 0);
+  assert.equal(d.nextStepType, "missing");
+  assert.equal(d.nextStepRawCount, null);
+  assert.equal(d.nextStepAcceptedCount, 0);
   assert.ok(!JSON.stringify(d).includes("ひみつ"));
 });
 
-test("質問候補が文字列で返った場合も、形式だけを記録する", () => {
+test("提案が文字列で返った場合も、形式だけを記録する", () => {
   const d = buildCoachDiagnostics(
     message([
       {
         type: "tool_use",
         id: "t",
         name: "propose_actions",
-        input: { follow_up_questions: '["価格の決め方を教えて"]' },
+        input: { next_step_suggestions: '[{"label":"価格を決める","message":"価格の決め方を教えて"}]' },
       },
     ]),
   );
-  assert.equal(d.followUpType, "string");
-  assert.equal(d.followUpRawCount, null);
-  assert.equal(d.followUpAcceptedCount, 0);
+  assert.equal(d.nextStepType, "string");
+  assert.equal(d.nextStepRawCount, null);
+  assert.equal(d.nextStepAcceptedCount, 0);
   assert.ok(!JSON.stringify(d).includes("価格"));
 });
