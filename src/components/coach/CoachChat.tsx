@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDown, Send } from "lucide-react";
-import { suggestedPrompts } from "@/lib/mock-data";
 import { ActionSuggestions } from "@/components/coach/ActionSuggestions";
 import { CoachCharacterAvatar } from "@/components/coach/CoachCharacterAvatar";
 import { resolveCoachCharacter } from "@/lib/coach/characters";
@@ -11,9 +10,10 @@ import {
   computeStreamingDisplayText,
   EMPTY_COACH_ACTIONS,
   sanitizeCoachActions,
-  sanitizeFollowUpQuestions,
+  sanitizeNextStepSuggestions,
   splitCoachStreamText,
   type CoachActions,
+  type CoachNextStepSuggestion,
 } from "@/lib/coach/actions-schema";
 import { AI_COACH_CONSENT_REQUIRED_CODE } from "@/lib/coach/consent";
 import type { CoachCharacterId, CoachMessage } from "@/lib/supabase/types";
@@ -32,19 +32,19 @@ interface CoachChatProps {
    */
   coachCharacterId: CoachCharacterId;
   /**
-   * 【一時的な調査用】trueの場合だけ、直前の回答で受け取った質問候補データの状況
+   * 【一時的な調査用】trueの場合だけ、直前の回答で受け取った提案ボタンのデータの状況
    * (区切りの検出・データ長・解析成否・候補数)を表示する。本文・質問の文面は表示しない。
    * coach/page.tsxがURLの?coachDebug=1を見て渡す。原因特定後に削除する。
    */
   debug?: boolean;
 }
 
-/** 【一時的な調査用】直前の回答で受け取った質問候補データの状況。 */
+/** 【一時的な調査用】直前の回答で受け取った提案ボタンのデータの状況。 */
 interface CoachDebugInfo {
   markerFound: boolean;
   dataLength: number;
   parseOk: boolean;
-  followUpCount: number;
+  nextStepCount: number;
 }
 
 interface ChatMessage {
@@ -75,7 +75,7 @@ export function CoachChat({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   // 直前のAIの回答と一緒に届いた「次の質問」候補。無い場合(会話履歴が無い・
   // ページを開き直した・生成や解析に失敗した等)は固定の質問例を表示する。
-  const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
+  const [nextSteps, setNextSteps] = useState<CoachNextStepSuggestion[]>([]);
   // 【一時的な調査用】debugがtrueのときだけ使う。原因特定後に削除する。
   const [debugInfo, setDebugInfo] = useState<CoachDebugInfo | null>(null);
   const scrollAnchorRef = useRef<HTMLDivElement>(null);
@@ -124,10 +124,10 @@ export function CoachChat({
 
     setErrorMessage(null);
     setIsSending(true);
-    // 入力欄の文章を送ったときだけ入力欄を空にする(質問候補をタップして
+    // 入力欄の文章を送ったときだけ入力欄を空にする(提案ボタンをタップして
     // 送ったときは、書きかけの文章を消さない)。
     setInput((current) => (current.trim() === trimmed ? "" : current));
-    setFollowUpQuestions([]);
+    setNextSteps([]);
 
     const userMessage: ChatMessage = {
       id: `local-user-${Date.now()}`,
@@ -192,27 +192,27 @@ export function CoachChat({
 
       const { displayText, actionsJson } = splitCoachStreamText(raw);
       let actions: CoachActions = EMPTY_COACH_ACTIONS;
-      let nextQuestions: string[] = [];
+      let nextStepSuggestions: CoachNextStepSuggestion[] = [];
       let parseOk = false; // 【一時的な調査用】解析の成否を記録するだけ(処理には使わない)
       if (actionsJson) {
         try {
           const parsed: unknown = JSON.parse(actionsJson);
           parseOk = true;
           actions = sanitizeCoachActions(parsed);
-          nextQuestions = sanitizeFollowUpQuestions(
-            (parsed as { followUpQuestions?: unknown } | null)?.followUpQuestions,
+          nextStepSuggestions = sanitizeNextStepSuggestions(
+            (parsed as { nextSteps?: unknown } | null)?.nextSteps,
           );
         } catch {
-          // 解析できない場合はボタン・質問候補を出さないだけで、通常の会話表示は維持する
+          // 解析できない場合はボタンを出さないだけで、通常の会話表示は維持する
         }
       }
-      setFollowUpQuestions(nextQuestions);
+      setNextSteps(nextStepSuggestions);
       if (debug) {
         setDebugInfo({
           markerFound: actionsJson !== null,
           dataLength: actionsJson?.length ?? 0,
           parseOk,
-          followUpCount: nextQuestions.length,
+          nextStepCount: nextStepSuggestions.length,
         });
       }
       setMessages((prev) =>
@@ -226,7 +226,7 @@ export function CoachChat({
     }
   }
 
-  // 質問候補をタップしたら、その質問をそのままAIコーチへ送信する。
+  // 提案ボタンをタップしたら、その提案を実行するためのメッセージをAIコーチへ送信する。
   function handleSuggestionClick(e: MouseEvent<HTMLButtonElement>) {
     void sendMessage(e.currentTarget.value);
   }
@@ -298,20 +298,23 @@ export function CoachChat({
         </p>
       ) : null}
 
-      <div className="flex flex-wrap gap-2">
-        {(followUpQuestions.length > 0 ? followUpQuestions : suggestedPrompts).map((prompt) => (
-          <button
-            key={prompt}
-            type="button"
-            disabled={isSending}
-            value={prompt}
-            onClick={handleSuggestionClick}
-            className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {prompt}
-          </button>
-        ))}
-      </div>
+      {/* 直前の回答でAIが実際に示した提案だけをボタンにする(提案が無ければ何も表示しない)。 */}
+      {nextSteps.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {nextSteps.map((step) => (
+            <button
+              key={step.label}
+              type="button"
+              disabled={isSending}
+              value={step.message}
+              onClick={handleSuggestionClick}
+              className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {step.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {debug ? (
         // 【一時的な調査用】?coachDebug=1のときだけ表示。本文・質問の文面・個人情報は出さない。
@@ -325,7 +328,7 @@ export function CoachChat({
               <p>区切り文字の検出: {debugInfo.markerFound ? "YES" : "NO"}</p>
               <p>区切り文字以降のデータ長: {debugInfo.dataLength}</p>
               <p>JSONの解析: {debugInfo.parseOk ? "YES" : "NO"}</p>
-              <p>質問候補の取得数: {debugInfo.followUpCount}</p>
+              <p>提案ボタンの取得数: {debugInfo.nextStepCount}</p>
             </>
           ) : (
             <p>まだ回答を受信していません(メッセージを送ると表示されます)</p>
